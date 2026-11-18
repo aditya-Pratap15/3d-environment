@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 // DOM Elements
 const canvas = document.querySelector('#webgl');
@@ -49,11 +49,14 @@ controls.maxDistance = 700;
 controls.target.set(0, 15, 0); // Focus on city center
 
 // 5. Lighting
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x475569, 0.9);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x64748b, 1.2);
 hemiLight.position.set(0, 150, 0);
 scene.add(hemiLight);
 
-const sunLight = new THREE.DirectionalLight(0xfffbeb, 2.0);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight(0xfffbeb, 2.2);
 sunLight.position.set(180, 240, 120);
 sunLight.castShadow = true;
 sunLight.shadow.mapSize.width = 2048;
@@ -67,7 +70,7 @@ sunLight.shadow.camera.bottom = -200;
 sunLight.shadow.bias = -0.0003;
 scene.add(sunLight);
 
-const fillLight = new THREE.DirectionalLight(0x93c5fd, 0.7);
+const fillLight = new THREE.DirectionalLight(0x93c5fd, 0.8);
 fillLight.position.set(-120, 90, -120);
 scene.add(fillLight);
 
@@ -133,63 +136,43 @@ rgbeLoader.load(
   }
 );
 
-// 8. Load 3D Castelia Skyscraper City Model
+// 8. Load 3D Castelia Skyscraper City Model with full vibrant colors & textures
 if (loaderDetails) loaderDetails.textContent = 'Loading 3D Castelia Skyscraper City...';
 
-// High-end PBR materials for buildings: reflective glass & architectural facades
-const buildingBodyMat = new THREE.MeshStandardMaterial({
-  color: 0x334155,
-  roughness: 0.45,
-  metalness: 0.5,
-});
+const gltfLoader = new GLTFLoader();
+gltfLoader.load(
+  './models/castelia/castelia_city.glb',
+  (gltf) => {
+    const city = gltf.scene;
 
-const buildingGlassMat = new THREE.MeshStandardMaterial({
-  color: 0x1e3a8a,
-  roughness: 0.1,
-  metalness: 0.9,
-});
-
-const buildingTrimMat = new THREE.MeshStandardMaterial({
-  color: 0x94a3b8,
-  roughness: 0.2,
-  metalness: 0.8,
-});
-
-const objLoader = new OBJLoader();
-objLoader.load(
-  './models/castelia/OBJ/Castelia City.obj',
-  (obj) => {
     // Calculate bounding box and scale
-    const box = new THREE.Box3().setFromObject(obj);
+    const box = new THREE.Box3().setFromObject(city);
     const center = box.getCenter(new THREE.Vector3());
 
     // Scale: original is ~273,000 units wide -> 0.0012 makes it ~327 meters wide
     const scale = 0.0012;
-    obj.scale.set(scale, scale, scale);
+    city.scale.set(scale, scale, scale);
 
     // Center on ground
-    obj.position.x = -center.x * scale;
-    obj.position.y = -box.min.y * scale;
-    obj.position.z = -center.z * scale;
+    city.position.x = -center.x * scale;
+    city.position.y = -box.min.y * scale;
+    city.position.z = -center.z * scale;
 
-    // Apply materials and shadow settings
-    obj.traverse((child) => {
+    // Preserve and enhance all vibrant textures and colors
+    city.traverse((child) => {
       if (child.isMesh) {
         child.castShadow = true;
         child.receiveShadow = true;
-        // Distribute materials for realistic architectural variation
-        const name = (child.name || '').toLowerCase();
-        if (name.includes('window') || name.includes('glass')) {
-          child.material = buildingGlassMat;
-        } else if (name.includes('metal') || name.includes('roof')) {
-          child.material = buildingTrimMat;
-        } else {
-          child.material = buildingBodyMat;
+        if (child.material) {
+          // Keep all original textures, colors, and maps
+          child.material.roughness = Math.min(child.material.roughness ?? 0.5, 0.6);
+          child.material.metalness = child.material.metalness ?? 0.2;
+          child.material.envMapIntensity = 1.0;
         }
       }
     });
 
-    scene.add(obj);
+    scene.add(city);
 
     modelLoaded = true;
     if (loaderProgress) loaderProgress.style.width = '100%';
@@ -207,7 +190,7 @@ objLoader.load(
     }
   },
   (err) => {
-    console.error('Error loading OBJ:', err);
+    console.error('Error loading GLB:', err);
     modelLoaded = true;
     checkLoadingDone();
   }
