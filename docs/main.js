@@ -74,16 +74,24 @@ const fillLight = new THREE.DirectionalLight(0x93c5fd, 0.8);
 fillLight.position.set(-120, 90, -120);
 scene.add(fillLight);
 
-// 6. Ground Plane (Clean reflective asphalt / plaza floor)
-const groundGeo = new THREE.PlaneGeometry(1500, 1500);
+// 6. Ground Plane (Lush Green Grass Lawn)
+const textureLoader = new THREE.TextureLoader();
+const grassTexture = textureLoader.load('./textures/grass.jpg');
+grassTexture.wrapS = THREE.RepeatWrapping;
+grassTexture.wrapT = THREE.RepeatWrapping;
+grassTexture.repeat.set(60, 60);
+grassTexture.colorSpace = THREE.SRGBColorSpace;
+
+const groundGeo = new THREE.PlaneGeometry(2500, 2500);
 const groundMat = new THREE.MeshStandardMaterial({
-  color: 0x1e293b,
-  roughness: 0.5,
-  metalness: 0.3,
+  map: grassTexture,
+  color: 0x86efac, // Vibrant spring lawn green tint
+  roughness: 0.85,
+  metalness: 0.05,
 });
 const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI / 2;
-ground.position.y = -0.1;
+ground.position.y = 0.0;
 ground.receiveShadow = true;
 scene.add(ground);
 
