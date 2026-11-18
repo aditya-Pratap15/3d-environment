@@ -161,9 +161,9 @@ gltfLoader.load(
     const scale = 0.0012;
     city.scale.set(scale, scale, scale);
 
-    // Center on ground
+    // Align city and terrain flush with the ground (no uplift / floating)
     city.position.x = -center.x * scale;
-    city.position.y = -box.min.y * scale;
+    city.position.y = 0.0;
     city.position.z = -center.z * scale;
 
     // Preserve and enhance all vibrant textures and colors
