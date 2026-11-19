@@ -137,6 +137,67 @@
       </div>
     </div>
 
+    <!-- Top Center Camera Director & MP4 Video Recorder Panel -->
+    <div class="camera-director-panel" id="camera-director-panel">
+      <!-- Header with Toggle Button -->
+      <div class="camera-director-header" id="camera-director-header">
+        <div class="camera-director-title">
+          <span>🎬</span>
+          <span>Camera Director & Video</span>
+        </div>
+        <button class="director-toggle-btn" id="director-toggle-btn" title="Toggle Camera Director" aria-label="Toggle Camera Director">−</button>
+      </div>
+
+      <div class="camera-director-body" id="camera-director-body">
+        <!-- Waypoint Controller -->
+        <div class="director-section">
+          <div class="director-row-header">
+            <span class="director-label">🎥 Flight Waypoints</span>
+            <span class="keyframe-count" id="keyframe-count">0 Points</span>
+          </div>
+
+          <div class="action-btn-group" style="margin-top: 5px;">
+            <button class="studio-btn primary" id="btn-add-keyframe" title="Add current camera view as a flight point">➕ Add Point</button>
+            <button class="studio-btn danger" id="btn-clear-keyframes" title="Clear all flight points">🗑️ Clear</button>
+          </div>
+
+          <!-- Waypoints Timeline Badges -->
+          <div class="waypoints-timeline" id="waypoints-timeline">
+            <span class="timeline-empty-hint">Orbit camera & click "Add Point" to create path</span>
+          </div>
+        </div>
+
+        <!-- Flight Settings: Duration & Curve -->
+        <div class="director-section">
+          <div class="slider-row" style="margin-bottom: 6px;">
+            <span class="director-sublabel">⏱️ Duration:</span>
+            <input type="range" id="flight-duration-slider" class="styled-slider director-slider" min="3" max="60" value="10" />
+            <span class="val-display" id="flight-duration-val">10s</span>
+          </div>
+          <div class="director-options-row">
+            <label class="director-checkbox-label">
+              <input type="checkbox" id="path-loop-checkbox" />
+              <span>🔁 Loop</span>
+            </label>
+            <label class="director-checkbox-label">
+              <input type="checkbox" id="show-path-line-checkbox" checked />
+              <span>👁️ 3D Path Line</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Playback & Video Recording Buttons -->
+        <div class="director-section" style="padding-top: 4px;">
+          <div class="action-btn-group">
+            <button class="studio-btn secondary" id="btn-preview-flight" title="Preview camera flight without recording">▶️ Preview</button>
+            <button class="studio-btn record-btn" id="btn-record-video" title="Record video and download MP4">🔴 Record MP4</button>
+          </div>
+          <!-- Live Status Indicator -->
+          <div class="director-status" id="director-status"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Top Right Combined Controls Card (Brightness + Sky Movement) -->
     <div class="top-controls-card" id="top-controls-card">
       <!-- Minimize Header -->
