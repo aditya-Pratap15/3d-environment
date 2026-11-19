@@ -1,0 +1,101 @@
+{
+  "default": {
+    "name": "Default Daytime",
+    "builtIn": true,
+    "brightness": 85,
+    "skySpeed": 35,
+    "skyDirection": "E_W",
+    "groundType": "grass",
+    "mountainStyle": "natural",
+    "objects": [
+      {
+        "id": "buildings_0",
+        "type": "buildings",
+        "isClone": false,
+        "offset": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "rotY": 0
+        }
+      },
+      {
+        "id": "mountains_0",
+        "type": "mountains",
+        "isClone": false,
+        "offset": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "rotY": 0
+        }
+      }
+    ]
+  },
+  "sunset": {
+    "name": "Sunset Autumn Vista",
+    "builtIn": true,
+    "brightness": 45,
+    "skySpeed": 25,
+    "skyDirection": "NW_SE",
+    "groundType": "autumn",
+    "mountainStyle": "canyon",
+    "objects": [
+      {
+        "id": "buildings_0",
+        "type": "buildings",
+        "isClone": false,
+        "offset": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "rotY": 0
+        }
+      },
+      {
+        "id": "mountains_0",
+        "type": "mountains",
+        "isClone": false,
+        "offset": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "rotY": 0
+        }
+      }
+    ]
+  },
+  "cyberpunk": {
+    "name": "Cyberpunk Night",
+    "builtIn": true,
+    "brightness": 12,
+    "skySpeed": 60,
+    "skyDirection": "NE_SW",
+    "groundType": "hexgrid",
+    "mountainStyle": "lava",
+    "objects": [
+      {
+        "id": "buildings_0",
+        "type": "buildings",
+        "isClone": false,
+        "offset": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "rotY": 25
+        }
+      },
+      {
+        "id": "mountains_0",
+        "type": "mountains",
+        "isClone": false,
+        "offset": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "rotY": 0
+        }
+      }
+    ]
+  }
+}

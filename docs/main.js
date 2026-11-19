@@ -188,7 +188,10 @@ ground.position.y = -0.05;
 ground.receiveShadow = true;
 scene.add(ground);
 
+let currentGroundType = 'grass';
+
 function switchGround(type) {
+  currentGroundType = type;
   const cfg = groundConfigs[type];
   if (!cfg || !loadedTextures[type]) return;
 
@@ -200,6 +203,14 @@ function switchGround(type) {
   groundMat.roughness = cfg.roughness;
   groundMat.metalness = cfg.metalness;
   groundMat.needsUpdate = true;
+
+  // Sync active UI state on ground boxes
+  if (groundBoxes && groundBoxes.length) {
+    groundBoxes.forEach((btn) => {
+      if (btn.dataset.ground === type) btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
+  }
 }
 
 // Minimal Mini Square Ground Box Switcher Handlers
@@ -581,7 +592,7 @@ function animate() {
 
 animate();
 
-// 13. Top Left Studio Controls: Multi-Object Instance Transform, Duplicate & Mountain Styles
+// 13. Top Left Studio Controls: Multi-Object Transform, Duplicate, Presets & Mountain Styles
 let objectsRegistry = [];
 let selectedObjectId = 'buildings_0';
 
@@ -602,6 +613,60 @@ const mountainStyleSelect = document.getElementById('mountain-style-select');
 const studioPanel = document.getElementById('studio-panel');
 const studioToggleBtn = document.getElementById('studio-toggle-btn');
 const studioHeader = document.getElementById('studio-header');
+
+// Presets DOM Elements
+const presetSelect = document.getElementById('preset-select');
+const btnSavePreset = document.getElementById('btn-save-preset');
+const btnNewPreset = document.getElementById('btn-new-preset');
+const btnExportPreset = document.getElementById('btn-export-preset');
+const btnDeletePreset = document.getElementById('btn-delete-preset');
+const presetStatus = document.getElementById('preset-status');
+
+// Built-in Default Presets
+const defaultPresets = {
+  default: {
+    name: 'Default Daytime',
+    builtIn: true,
+    brightness: 85,
+    skySpeed: 35,
+    skyDirection: 'E_W',
+    groundType: 'grass',
+    mountainStyle: 'natural',
+    objects: [
+      { id: 'buildings_0', type: 'buildings', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 0 } },
+      { id: 'mountains_0', type: 'mountains', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 0 } },
+    ],
+  },
+  sunset: {
+    name: 'Sunset Autumn Vista',
+    builtIn: true,
+    brightness: 45,
+    skySpeed: 25,
+    skyDirection: 'NW_SE',
+    groundType: 'autumn',
+    mountainStyle: 'canyon',
+    objects: [
+      { id: 'buildings_0', type: 'buildings', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 0 } },
+      { id: 'mountains_0', type: 'mountains', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 0 } },
+    ],
+  },
+  cyberpunk: {
+    name: 'Cyberpunk Night',
+    builtIn: true,
+    brightness: 12,
+    skySpeed: 60,
+    skyDirection: 'NE_SW',
+    groundType: 'hexgrid',
+    mountainStyle: 'lava',
+    objects: [
+      { id: 'buildings_0', type: 'buildings', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 25 } },
+      { id: 'mountains_0', type: 'mountains', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 0 } },
+    ],
+  },
+};
+
+let presetsData = { ...defaultPresets };
+let activePresetKey = 'default';
 
 function initObjectsRegistry() {
   objectsRegistry = [
@@ -627,6 +692,9 @@ function initObjectsRegistry() {
   selectedObjectId = 'buildings_0';
   updateObjectSelectOptions();
   updateSliderUI();
+
+  // Load and apply saved presets
+  loadStoredPresets();
 }
 
 function getSelectedObject() {
@@ -852,6 +920,247 @@ function switchMountainStyle(styleKey) {
 if (mountainStyleSelect) {
   mountainStyleSelect.addEventListener('change', (e) => {
     switchMountainStyle(e.target.value);
+  });
+}
+
+// --- Preset Management System ---
+function loadStoredPresets() {
+  try {
+    const raw = localStorage.getItem('3d_env_presets');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      presetsData = { ...defaultPresets, ...parsed };
+    }
+    const savedActive = localStorage.getItem('3d_env_active_preset');
+    if (savedActive && presetsData[savedActive]) {
+      activePresetKey = savedActive;
+    }
+  } catch (err) {
+    console.warn('Could not load presets from localStorage:', err);
+  }
+  updatePresetDropdown();
+  if (activePresetKey !== 'default') {
+    applyPreset(activePresetKey);
+  }
+}
+
+function updatePresetDropdown() {
+  if (!presetSelect) return;
+  presetSelect.innerHTML = '';
+  Object.entries(presetsData).forEach(([key, preset]) => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = preset.name;
+    if (key === activePresetKey) opt.selected = true;
+    presetSelect.appendChild(opt);
+  });
+}
+
+function applyPreset(key) {
+  const p = presetsData[key];
+  if (!p) return;
+  activePresetKey = key;
+  localStorage.setItem('3d_env_active_preset', key);
+
+  // 1. Brightness
+  if (p.brightness !== undefined) {
+    if (brightnessSlider) brightnessSlider.value = p.brightness;
+    setBrightnessLevel(p.brightness);
+  }
+
+  // 2. Sky Speed
+  if (p.skySpeed !== undefined) {
+    if (skySpeedSlider) skySpeedSlider.value = p.skySpeed;
+    updateSkySpeed(p.skySpeed);
+  }
+
+  // 3. Sky Direction
+  if (p.skyDirection) {
+    currentSkyDirection = p.skyDirection;
+    dirButtons.forEach((b) => {
+      if (b.dataset.dir === p.skyDirection) b.classList.add('active');
+      else b.classList.remove('active');
+    });
+  }
+
+  // 4. Ground Texture
+  if (p.groundType) {
+    switchGround(p.groundType);
+  }
+
+  // 5. Mountain Style
+  if (p.mountainStyle) {
+    if (mountainStyleSelect) mountainStyleSelect.value = p.mountainStyle;
+    switchMountainStyle(p.mountainStyle);
+  }
+
+  // 6. Objects & Duplicates
+  // Remove existing clones from scene
+  const clonesToRemove = objectsRegistry.filter((o) => o.isClone);
+  clonesToRemove.forEach((c) => scene.remove(c.group));
+
+  // Keep original 2 base objects
+  objectsRegistry = objectsRegistry.filter((o) => !o.isClone);
+
+  if (Array.isArray(p.objects)) {
+    p.objects.forEach((objData) => {
+      if (!objData.isClone) {
+        const existing = objectsRegistry.find((o) => o.id === objData.id || o.type === objData.type);
+        if (existing) {
+          existing.offset = { ...objData.offset };
+          existing.group.position.set(
+            existing.basePos.x + existing.offset.x,
+            existing.basePos.y + existing.offset.y,
+            existing.basePos.z + existing.offset.z
+          );
+          existing.group.rotation.y = (existing.offset.rotY * Math.PI) / 180;
+        }
+      } else {
+        const srcGroup = objData.type === 'buildings' ? buildingsGroup : mountainGroup;
+        const cloneGroup = srcGroup.clone(true);
+        const basePos = new THREE.Vector3(
+          objData.basePos?.x ?? baseModelPos.x,
+          objData.basePos?.y ?? baseModelPos.y,
+          objData.basePos?.z ?? baseModelPos.z
+        );
+        cloneGroup.position.set(
+          basePos.x + (objData.offset?.x ?? 0),
+          basePos.y + (objData.offset?.y ?? 0),
+          basePos.z + (objData.offset?.z ?? 0)
+        );
+        cloneGroup.rotation.y = ((objData.offset?.rotY ?? 0) * Math.PI) / 180;
+        scene.add(cloneGroup);
+
+        objectsRegistry.push({
+          id: objData.id || `${objData.type}_clone_${Date.now()}_${Math.random()}`,
+          type: objData.type,
+          name: objData.name || `${objData.type === 'buildings' ? '🏙️ Buildings' : '⛰️ Mountains'} (Clone)`,
+          isClone: true,
+          group: cloneGroup,
+          basePos: basePos,
+          offset: { ...(objData.offset || { x: 0, y: 0, z: 0, rotY: 0 }) },
+        });
+      }
+    });
+  }
+
+  selectedObjectId = objectsRegistry[0].id;
+  updateObjectSelectOptions();
+  updateSliderUI();
+
+  if (presetStatus) {
+    presetStatus.textContent = `Loaded preset: "${p.name}"`;
+    setTimeout(() => {
+      if (presetStatus) presetStatus.textContent = '';
+    }, 3500);
+  }
+}
+
+function saveCurrentPreset(key, customName = null) {
+  const currentObjState = objectsRegistry.map((o) => ({
+    id: o.id,
+    type: o.type,
+    name: o.name,
+    isClone: o.isClone,
+    basePos: { x: o.basePos.x, y: o.basePos.y, z: o.basePos.z },
+    offset: { ...o.offset },
+  }));
+
+  const name = customName || presetsData[key]?.name || 'Custom Scene';
+
+  presetsData[key] = {
+    name: name,
+    builtIn: presetsData[key]?.builtIn || false,
+    brightness: Number(brightnessSlider?.value ?? 85),
+    skySpeed: Number(skySpeedSlider?.value ?? 35),
+    skyDirection: currentSkyDirection,
+    groundType: currentGroundType,
+    mountainStyle: mountainStyleSelect?.value ?? 'natural',
+    objects: currentObjState,
+  };
+
+  // Persist into localStorage
+  const toStore = {};
+  Object.entries(presetsData).forEach(([k, val]) => {
+    if (!val.builtIn) toStore[k] = val;
+  });
+  localStorage.setItem('3d_env_presets', JSON.stringify(toStore));
+  localStorage.setItem('3d_env_active_preset', key);
+
+  updatePresetDropdown();
+
+  if (presetStatus) {
+    presetStatus.textContent = `✓ "${name}" saved! Auto-loads on open.`;
+    setTimeout(() => {
+      if (presetStatus) presetStatus.textContent = '';
+    }, 4500);
+  }
+}
+
+if (presetSelect) {
+  presetSelect.addEventListener('change', (e) => {
+    applyPreset(e.target.value);
+  });
+}
+
+if (btnSavePreset) {
+  btnSavePreset.addEventListener('click', () => {
+    saveCurrentPreset(activePresetKey);
+  });
+}
+
+if (btnNewPreset) {
+  btnNewPreset.addEventListener('click', () => {
+    const name = prompt('Enter a name for the new preset:', `Preset #${Object.keys(presetsData).length + 1}`);
+    if (!name || !name.trim()) return;
+    const newKey = `preset_${Date.now()}`;
+    saveCurrentPreset(newKey, name.trim());
+    activePresetKey = newKey;
+    updatePresetDropdown();
+  });
+}
+
+if (btnDeletePreset) {
+  btnDeletePreset.addEventListener('click', () => {
+    const cur = presetsData[activePresetKey];
+    if (!cur) return;
+    if (cur.builtIn) {
+      alert('Built-in presets (Default, Sunset, Cyberpunk) cannot be deleted.');
+      return;
+    }
+
+    delete presetsData[activePresetKey];
+    const toStore = {};
+    Object.entries(presetsData).forEach(([k, val]) => {
+      if (!val.builtIn) toStore[k] = val;
+    });
+    localStorage.setItem('3d_env_presets', JSON.stringify(toStore));
+
+    // Fall back to default
+    activePresetKey = 'default';
+    updatePresetDropdown();
+    applyPreset('default');
+
+    if (presetStatus) {
+      presetStatus.textContent = `🗑️ "${cur.name}" deleted`;
+      setTimeout(() => {
+        if (presetStatus) presetStatus.textContent = '';
+      }, 3000);
+    }
+  });
+}
+
+if (btnExportPreset) {
+  btnExportPreset.addEventListener('click', () => {
+    const cur = presetsData[activePresetKey];
+    if (!cur) return;
+    const blob = new Blob([JSON.stringify(cur, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `preset-${activePresetKey}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   });
 }
 

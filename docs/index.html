@@ -15,7 +15,7 @@
       }
     }
     </script>
-    <script type="module" crossorigin src="./assets/index-iUkkQUsc.js"></script>
+    <script type="module" crossorigin src="./assets/index-D_GfENRK.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-B4EBNSak.css">
   </head>
   <body>
@@ -55,6 +55,25 @@
       </div>
 
       <div class="studio-body" id="studio-body">
+        <!-- Presets & Saved Scenes Section -->
+        <div class="studio-section">
+          <label class="section-label">💾 Scene Presets</label>
+          <select id="preset-select" class="studio-select" aria-label="Select Saved Preset">
+            <option value="default">Default Daytime</option>
+            <option value="sunset">Sunset Autumn Vista</option>
+            <option value="cyberpunk">Cyberpunk Night</option>
+          </select>
+          <div class="action-btn-group" style="margin-top: 5px;">
+            <button class="studio-btn primary" id="btn-save-preset" title="Save current settings to this preset">💾 Save</button>
+            <button class="studio-btn secondary" id="btn-new-preset" title="Create a new named preset">➕ New</button>
+          </div>
+          <div class="action-btn-group" style="margin-top: 4px;">
+            <button class="studio-btn secondary" id="btn-export-preset" title="Download preset as JSON file">📤 Export</button>
+            <button class="studio-btn danger" id="btn-delete-preset" title="Delete selected preset">🗑️ Delete</button>
+          </div>
+          <div id="preset-status" class="duplicate-status"></div>
+        </div>
+
         <!-- Target Object Selector (Supports Main & All Clones) -->
         <div class="studio-section">
           <label class="section-label">Active Target Object</label>
