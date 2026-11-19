@@ -15,8 +15,8 @@
       }
     }
     </script>
-    <script type="module" crossorigin src="./assets/index-yzSZQdd1.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BDum69_D.css">
+    <script type="module" crossorigin src="./assets/index-QExKponV.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-AKae4A1E.css">
   </head>
   <body>
     <!-- Fullscreen 3D Canvas -->
@@ -249,6 +249,133 @@
           </div>
           <!-- Live Status Indicator -->
           <div class="director-status" id="director-status"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top 3D Image & Cutout Studio Panel (Beside the Record Box) -->
+    <div class="image-studio-panel" id="image-studio-panel">
+      <!-- Header with Toggle Button -->
+      <div class="image-studio-header" id="image-studio-header">
+        <div class="image-studio-title">
+          <span>🖼️</span>
+          <span>3D Image & Cutout Studio</span>
+        </div>
+        <button class="image-studio-toggle-btn" id="image-studio-toggle-btn" title="Toggle 3D Image Studio" aria-label="Toggle 3D Image Studio">−</button>
+      </div>
+
+      <!-- Scrollable Body with Controls -->
+      <div class="image-studio-body" id="image-studio-body">
+        <!-- 1. File Upload Section -->
+        <div class="image-studio-section">
+          <input type="file" id="image-upload-input" accept="image/png,image/jpeg,image/webp" style="display: none;" />
+          <button class="studio-btn primary" id="btn-upload-image" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600;" title="Upload JPG or Cutout PNG to spawn in 3D">
+            <span>📁</span>
+            <span>Upload Image / Cutout</span>
+          </button>
+          <div id="image-upload-info" style="font-size: 10.5px; color: #94a3b8; margin-top: 5px; text-align: center;">
+            Upload PNG cutouts, JPGs, or WebP
+          </div>
+        </div>
+
+        <!-- 2. Active 3D Image Object Controls (Visible once an image is loaded) -->
+        <div class="image-studio-section" id="image-object-ctrls" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label class="section-label" style="margin: 0;">Active 3D Image</label>
+            <button class="studio-btn danger" id="btn-delete-image" style="padding: 2px 8px; font-size: 10px;" title="Remove this 3D image">🗑️ Delete</button>
+          </div>
+          <select id="image-object-select" class="studio-select" style="margin-bottom: 6px;"></select>
+
+          <!-- Shape / 3D Style Mode -->
+          <div style="font-size: 10.5px; color: #94a3b8; margin: 4px 0 2px 2px;">
+            <span>📐 3D Volume Mode</span>
+          </div>
+          <select id="image-style-mode" class="studio-select" style="margin-bottom: 8px;">
+            <option value="block">💎 3D Crystal / Glass Plaque</option>
+            <option value="cutout">✂️ 3D Contour Cutout Silhouette</option>
+          </select>
+
+          <!-- 3. Size: Width, Height, Depth (Thickness) -->
+          <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+              <span style="font-size: 11px; font-weight: 700; color: #f8fafc;">📏 3D Dimensions</span>
+              <label style="font-size: 10px; color: #38bdf8; display: flex; align-items: center; gap: 3px; cursor: pointer;">
+                <input type="checkbox" id="image-aspect-lock" checked />
+                <span>Keep Ratio</span>
+              </label>
+            </div>
+
+            <!-- Width (X) -->
+            <div style="font-size: 10px; color: #94a3b8; margin: 3px 0 1px 2px;">Width (X)</div>
+            <div class="slider-row">
+              <span class="axis-badge">W</span>
+              <input type="range" id="img-width-slider" class="styled-slider studio-slider" min="0.2" max="150" step="0.2" value="20" />
+              <span class="val-display" id="img-width-val">20m</span>
+            </div>
+
+            <!-- Height (Y) -->
+            <div style="font-size: 10px; color: #94a3b8; margin: 3px 0 1px 2px;">Height (Y)</div>
+            <div class="slider-row">
+              <span class="axis-badge">H</span>
+              <input type="range" id="img-height-slider" class="styled-slider studio-slider" min="0.2" max="150" step="0.2" value="20" />
+              <span class="val-display" id="img-height-val">20m</span>
+            </div>
+
+            <!-- Depth / Thickness (Z) -->
+            <div style="font-size: 10px; color: #94a3b8; margin: 3px 0 1px 2px;">3D Thickness / Depth (Z)</div>
+            <div class="slider-row" title="Increase 3D depth/thickness from paper-thin to massive volume">
+              <span class="axis-badge">D</span>
+              <input type="range" id="img-depth-slider" class="styled-slider studio-slider" min="0.05" max="60" step="0.1" value="3.0" />
+              <span class="val-display" id="img-depth-val">3.0m</span>
+            </div>
+          </div>
+
+          <!-- 4. Extruded Width/Edge Style: Reflection & Transparency -->
+          <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px; margin-top: 6px;">
+            <span style="font-size: 11px; font-weight: 700; color: #f8fafc;">✨ Extruded Edge Style</span>
+
+            <!-- Transparency Level -->
+            <div style="font-size: 10px; color: #94a3b8; margin: 3px 0 1px 2px;">Side Transparency Level</div>
+            <div class="slider-row" title="Side transparency: 0% = solid opaque, 100% = crystal glass">
+              <span class="axis-badge">🫧</span>
+              <input type="range" id="img-transparency-slider" class="styled-slider studio-slider" min="0" max="100" value="40" />
+              <span class="val-display" id="img-transparency-val">40%</span>
+            </div>
+
+            <!-- Side Reflection / Glossiness -->
+            <div style="font-size: 10px; color: #94a3b8; margin: 3px 0 1px 2px;">Side Edge Reflection</div>
+            <div class="slider-row" title="Mirror reflection of the image & sky on the 3D thickness">
+              <span class="axis-badge">🪞</span>
+              <input type="range" id="img-reflection-slider" class="styled-slider studio-slider" min="0" max="100" value="80" />
+              <span class="val-display" id="img-reflection-val">80%</span>
+            </div>
+          </div>
+
+          <!-- 5. 3D Position & Rotation -->
+          <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px; margin-top: 6px;">
+            <span style="font-size: 11px; font-weight: 700; color: #f8fafc;">📍 Position & Rotation</span>
+
+            <div class="slider-row" style="margin-top: 3px;">
+              <span class="axis-badge">X</span>
+              <input type="range" id="img-pos-x-slider" class="styled-slider studio-slider" min="-250" max="250" value="0" />
+              <span class="val-display" id="img-pos-x-val">0m</span>
+            </div>
+            <div class="slider-row">
+              <span class="axis-badge">Y</span>
+              <input type="range" id="img-pos-y-slider" class="styled-slider studio-slider" min="0" max="150" value="12" />
+              <span class="val-display" id="img-pos-y-val">12m</span>
+            </div>
+            <div class="slider-row">
+              <span class="axis-badge">Z</span>
+              <input type="range" id="img-pos-z-slider" class="styled-slider studio-slider" min="-250" max="250" value="30" />
+              <span class="val-display" id="img-pos-z-val">30m</span>
+            </div>
+            <div class="slider-row">
+              <span class="axis-badge">↻</span>
+              <input type="range" id="img-rot-y-slider" class="styled-slider studio-slider" min="0" max="360" value="0" />
+              <span class="val-display" id="img-rot-y-val">0°</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

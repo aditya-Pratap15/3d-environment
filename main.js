@@ -2115,3 +2115,568 @@ if (directorToggleBtn && cameraDirectorPanel) {
     });
   }
 }
+
+// =====================================================================
+// --- 15. Top 3D Image & Cutout Studio (Beside the Record Box) ---
+// =====================================================================
+const imageStudioPanel = document.getElementById('image-studio-panel');
+const imageStudioToggleBtn = document.getElementById('image-studio-toggle-btn');
+const imageStudioHeader = document.getElementById('image-studio-header');
+const imageUploadInput = document.getElementById('image-upload-input');
+const btnUploadImage = document.getElementById('btn-upload-image');
+const imageUploadInfo = document.getElementById('image-upload-info');
+const imageObjectCtrls = document.getElementById('image-object-ctrls');
+const imageObjectSelect = document.getElementById('image-object-select');
+const btnDeleteImage = document.getElementById('btn-delete-image');
+const imageStyleMode = document.getElementById('image-style-mode');
+const imageAspectLock = document.getElementById('image-aspect-lock');
+
+const imgWidthSlider = document.getElementById('img-width-slider');
+const imgWidthVal = document.getElementById('img-width-val');
+const imgHeightSlider = document.getElementById('img-height-slider');
+const imgHeightVal = document.getElementById('img-height-val');
+const imgDepthSlider = document.getElementById('img-depth-slider');
+const imgDepthVal = document.getElementById('img-depth-val');
+const imgTransparencySlider = document.getElementById('img-transparency-slider');
+const imgTransparencyVal = document.getElementById('img-transparency-val');
+const imgReflectionSlider = document.getElementById('img-reflection-slider');
+const imgReflectionVal = document.getElementById('img-reflection-val');
+
+const imgPosXSlider = document.getElementById('img-pos-x-slider');
+const imgPosXVal = document.getElementById('img-pos-x-val');
+const imgPosYSlider = document.getElementById('img-pos-y-slider');
+const imgPosYVal = document.getElementById('img-pos-y-val');
+const imgPosZSlider = document.getElementById('img-pos-z-slider');
+const imgPosZVal = document.getElementById('img-pos-z-val');
+const imgRotYSlider = document.getElementById('img-rot-y-slider');
+const imgRotYVal = document.getElementById('img-rot-y-val');
+
+let image3dRegistry = [];
+let selectedImageId = null;
+
+function getSelectedImage3D() {
+  return image3dRegistry.find((o) => o.id === selectedImageId) || (image3dRegistry.length > 0 ? image3dRegistry[0] : null);
+}
+
+// Alpha contour tracing for background-removed PNG cutouts
+function traceAlphaContour(img, targetWidth, targetHeight) {
+  try {
+    const maxDim = 100;
+    const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(16, Math.round(img.naturalWidth * scale));
+    const h = Math.max(16, Math.round(img.naturalHeight * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, w, h);
+    const data = ctx.getImageData(0, 0, w, h).data;
+
+    const isSolid = (x, y) => {
+      if (x < 0 || x >= w || y < 0 || y >= h) return false;
+      return data[(y * w + x) * 4 + 3] > 30;
+    };
+
+    let startX = -1, startY = -1;
+    for (let y = 0; y < h && startX === -1; y++) {
+      for (let x = 0; x < w; x++) {
+        if (isSolid(x, y)) {
+          startX = x;
+          startY = y;
+          break;
+        }
+      }
+    }
+
+    if (startX === -1) return null;
+
+    const points = [];
+    const directions = [
+      { dx: 1, dy: 0 }, { dx: 1, dy: 1 }, { dx: 0, dy: 1 }, { dx: -1, dy: 1 },
+      { dx: -1, dy: 0 }, { dx: -1, dy: -1 }, { dx: 0, dy: -1 }, { dx: 1, dy: -1 },
+    ];
+
+    let cx = startX, cy = startY;
+    let dir = 7;
+    const maxSteps = 800;
+    let steps = 0;
+
+    do {
+      const nx = ((cx / w) - 0.5) * targetWidth;
+      const ny = (0.5 - (cy / h)) * targetHeight;
+      points.push(new THREE.Vector2(nx, ny));
+
+      let found = false;
+      for (let i = 0; i < 8; i++) {
+        const nd = (dir + i) % 8;
+        const nxCoord = cx + directions[nd].dx;
+        const nyCoord = cy + directions[nd].dy;
+        if (isSolid(nxCoord, nyCoord)) {
+          cx = nxCoord;
+          cy = nyCoord;
+          dir = (nd + 5) % 8;
+          found = true;
+          break;
+        }
+      }
+      if (!found) break;
+      steps++;
+    } while ((cx !== startX || cy !== startY) && steps < maxSteps);
+
+    if (points.length < 4) return null;
+
+    const simplified = [];
+    const minDistanceSq = Math.pow(Math.min(targetWidth, targetHeight) * 0.025, 2);
+    let lastPt = points[0];
+    simplified.push(lastPt);
+
+    for (let i = 1; i < points.length; i++) {
+      const pt = points[i];
+      if (pt.distanceToSquared(lastPt) >= minDistanceSq) {
+        simplified.push(pt);
+        lastPt = pt;
+      }
+    }
+
+    if (simplified.length < 3) return null;
+    return new THREE.Shape(simplified);
+  } catch (err) {
+    console.warn('Contour tracing fallback:', err);
+    return null;
+  }
+}
+
+function buildImageGeometryAndMaterials(imgObj) {
+  const { img, width, height, depth, transparency, reflection, mode, dataUrl } = imgObj;
+
+  if (!imgObj.texture) {
+    imgObj.texture = new THREE.TextureLoader().load(dataUrl);
+    imgObj.texture.colorSpace = THREE.SRGBColorSpace;
+  }
+
+  if (!imgObj.sideTexture) {
+    imgObj.sideTexture = imgObj.texture.clone();
+    imgObj.sideTexture.wrapS = THREE.MirroredRepeatWrapping;
+    imgObj.sideTexture.wrapT = THREE.MirroredRepeatWrapping;
+    imgObj.sideTexture.repeat.set(1, 1);
+    imgObj.sideTexture.needsUpdate = true;
+  }
+
+  const frontMat = new THREE.MeshStandardMaterial({
+    map: imgObj.texture,
+    transparent: true,
+    alphaTest: imgObj.hasAlpha ? 0.05 : 0,
+    roughness: 0.25,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+  });
+
+  const backMat = frontMat.clone();
+
+  const alphaOpacity = 1.0 - (transparency / 100) * 0.95;
+  const glossRoughness = 1.0 - (reflection / 100) * 0.92;
+
+  const sideMat = new THREE.MeshPhysicalMaterial({
+    map: imgObj.sideTexture,
+    transparent: true,
+    opacity: alphaOpacity,
+    roughness: glossRoughness,
+    metalness: 0.15,
+    reflectivity: 0.95,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.08,
+    side: THREE.DoubleSide,
+    depthWrite: alphaOpacity > 0.35,
+  });
+
+  imgObj.frontMat = frontMat;
+  imgObj.backMat = backMat;
+  imgObj.sideMat = sideMat;
+
+  let geo;
+  let materials;
+
+  if (mode === 'cutout' && imgObj.hasAlpha) {
+    const shape = traceAlphaContour(img, width, height);
+    if (shape) {
+      geo = new THREE.ExtrudeGeometry(shape, {
+        depth: depth,
+        bevelEnabled: true,
+        bevelSegments: 2,
+        steps: 1,
+        bevelSize: Math.min(0.2, depth * 0.1),
+        bevelThickness: Math.min(0.2, depth * 0.1),
+      });
+
+      const pos = geo.attributes.position;
+      const uvs = [];
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const y = pos.getY(i);
+        uvs.push((x / width) + 0.5, (y / height) + 0.5);
+      }
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geo.center();
+      materials = [frontMat, sideMat];
+    } else {
+      geo = new THREE.BoxGeometry(width, height, depth);
+      materials = [sideMat, sideMat, sideMat, sideMat, frontMat, backMat];
+    }
+  } else {
+    geo = new THREE.BoxGeometry(width, height, depth);
+    materials = [sideMat, sideMat, sideMat, sideMat, frontMat, backMat];
+  }
+
+  return { geometry: geo, materials: materials };
+}
+
+function updateSelectedImage3D(rebuildGeo = true) {
+  const obj = getSelectedImage3D();
+  if (!obj || !obj.mesh) return;
+
+  if (rebuildGeo) {
+    const { geometry, materials } = buildImageGeometryAndMaterials(obj);
+    if (obj.mesh.geometry) obj.mesh.geometry.dispose();
+    obj.mesh.geometry = geometry;
+    obj.mesh.material = materials;
+  } else {
+    if (obj.sideMat) {
+      const alphaOpacity = 1.0 - (obj.transparency / 100) * 0.95;
+      const glossRoughness = 1.0 - (obj.reflection / 100) * 0.92;
+      obj.sideMat.opacity = alphaOpacity;
+      obj.sideMat.roughness = glossRoughness;
+      obj.sideMat.depthWrite = alphaOpacity > 0.35;
+      obj.sideMat.needsUpdate = true;
+    }
+  }
+
+  obj.group.position.set(obj.position.x, obj.position.y, obj.position.z);
+  obj.group.rotation.y = (obj.rotationY * Math.PI) / 180;
+
+  prepareMeshShadows(obj.group);
+}
+
+function updateImageSelectOptions() {
+  if (!imageObjectSelect) return;
+  imageObjectSelect.innerHTML = '';
+
+  if (image3dRegistry.length === 0) {
+    if (imageObjectCtrls) imageObjectCtrls.style.display = 'none';
+    return;
+  }
+
+  if (imageObjectCtrls) imageObjectCtrls.style.display = 'flex';
+
+  image3dRegistry.forEach((obj) => {
+    const opt = document.createElement('option');
+    opt.value = obj.id;
+    opt.textContent = obj.name;
+    if (obj.id === selectedImageId) opt.selected = true;
+    imageObjectSelect.appendChild(opt);
+  });
+}
+
+function updateImageSliderUI() {
+  const obj = getSelectedImage3D();
+  if (!obj) return;
+
+  if (imgWidthSlider) imgWidthSlider.value = obj.width;
+  if (imgWidthVal) imgWidthVal.textContent = `${obj.width.toFixed(1)}m`;
+
+  if (imgHeightSlider) imgHeightSlider.value = obj.height;
+  if (imgHeightVal) imgHeightVal.textContent = `${obj.height.toFixed(1)}m`;
+
+  if (imgDepthSlider) imgDepthSlider.value = obj.depth;
+  if (imgDepthVal) imgDepthVal.textContent = `${obj.depth.toFixed(1)}m`;
+
+  if (imgTransparencySlider) imgTransparencySlider.value = obj.transparency;
+  if (imgTransparencyVal) imgTransparencyVal.textContent = `${obj.transparency}%`;
+
+  if (imgReflectionSlider) imgReflectionSlider.value = obj.reflection;
+  if (imgReflectionVal) imgReflectionVal.textContent = `${obj.reflection}%`;
+
+  if (imgPosXSlider) imgPosXSlider.value = obj.position.x;
+  if (imgPosXVal) imgPosXVal.textContent = `${obj.position.x}m`;
+
+  if (imgPosYSlider) imgPosYSlider.value = obj.position.y;
+  if (imgPosYVal) imgPosYVal.textContent = `${obj.position.y}m`;
+
+  if (imgPosZSlider) imgPosZSlider.value = obj.position.z;
+  if (imgPosZVal) imgPosZVal.textContent = `${obj.position.z}m`;
+
+  if (imgRotYSlider) imgRotYSlider.value = obj.rotationY;
+  if (imgRotYVal) imgRotYVal.textContent = `${obj.rotationY}°`;
+
+  if (imageStyleMode) imageStyleMode.value = obj.mode;
+}
+
+let imageCountIndex = 0;
+function createImage3DObject(img, dataUrl, fileName) {
+  if (typeof pushHistoryState === 'function') pushHistoryState();
+
+  imageCountIndex++;
+  const id = `image3d_${Date.now()}_${imageCountIndex}`;
+
+  // Analyze transparency
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0);
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+  let hasAlpha = false;
+  for (let i = 3; i < data.length; i += 32) {
+    if (data[i] < 220) {
+      hasAlpha = true;
+      break;
+    }
+  }
+
+  const aspect = img.naturalWidth / img.naturalHeight;
+  const baseWidth = aspect >= 1 ? 22 : 22 * aspect;
+  const baseHeight = aspect >= 1 ? 22 / aspect : 22;
+  const baseDepth = 3.0; // 3D depth
+
+  const newObj = {
+    id: id,
+    name: `🖼️ ${fileName ? fileName.slice(0, 16) : 'Image'} #${imageCountIndex}`,
+    dataUrl: dataUrl,
+    img: img,
+    hasAlpha: hasAlpha,
+    aspect: aspect,
+    mode: hasAlpha ? 'cutout' : 'block',
+    width: Number(baseWidth.toFixed(1)),
+    height: Number(baseHeight.toFixed(1)),
+    depth: baseDepth,
+    transparency: 40,
+    reflection: 80,
+    position: { x: 0, y: Number((baseHeight / 2 + 2).toFixed(1)), z: 35 },
+    rotationY: 0,
+    group: new THREE.Group(),
+  };
+
+  const { geometry, materials } = buildImageGeometryAndMaterials(newObj);
+  const mesh = new THREE.Mesh(geometry, materials);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  newObj.mesh = mesh;
+  newObj.group.add(mesh);
+
+  newObj.group.position.set(newObj.position.x, newObj.position.y, newObj.position.z);
+  newObj.group.rotation.y = (newObj.rotationY * Math.PI) / 180;
+
+  scene.add(newObj.group);
+  prepareMeshShadows(newObj.group);
+
+  image3dRegistry.push(newObj);
+  selectedImageId = id;
+
+  updateImageSelectOptions();
+  updateImageSliderUI();
+
+  if (imageUploadInfo) {
+    imageUploadInfo.textContent = `✓ "${newObj.name}" active in 3D!`;
+    setTimeout(() => {
+      if (imageUploadInfo) imageUploadInfo.textContent = 'Upload PNG cutouts, JPGs, or WebP';
+    }, 4000);
+  }
+}
+
+if (btnUploadImage && imageUploadInput) {
+  btnUploadImage.addEventListener('click', () => {
+    imageUploadInput.click();
+  });
+
+  imageUploadInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target.result;
+      const img = new Image();
+      img.onload = () => {
+        createImage3DObject(img, dataUrl, file.name);
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+    imageUploadInput.value = '';
+  });
+}
+
+if (imageObjectSelect) {
+  imageObjectSelect.addEventListener('change', (e) => {
+    selectedImageId = e.target.value;
+    updateImageSliderUI();
+  });
+}
+
+if (btnDeleteImage) {
+  btnDeleteImage.addEventListener('click', () => {
+    const idx = image3dRegistry.findIndex((o) => o.id === selectedImageId);
+    if (idx === -1) return;
+
+    if (typeof pushHistoryState === 'function') pushHistoryState();
+
+    const obj = image3dRegistry[idx];
+    scene.remove(obj.group);
+    image3dRegistry.splice(idx, 1);
+
+    selectedImageId = image3dRegistry.length > 0 ? image3dRegistry[0].id : null;
+    updateImageSelectOptions();
+    updateImageSliderUI();
+  });
+}
+
+if (imageStyleMode) {
+  imageStyleMode.addEventListener('change', (e) => {
+    const obj = getSelectedImage3D();
+    if (obj) {
+      if (typeof pushHistoryState === 'function') pushHistoryState();
+      obj.mode = e.target.value;
+      updateSelectedImage3D(true);
+    }
+  });
+}
+
+if (imgWidthSlider) {
+  imgWidthSlider.addEventListener('input', (e) => {
+    const obj = getSelectedImage3D();
+    if (!obj) return;
+    const newW = Number(e.target.value);
+    obj.width = newW;
+    if (imgWidthVal) imgWidthVal.textContent = `${newW.toFixed(1)}m`;
+
+    if (imageAspectLock && imageAspectLock.checked && obj.aspect) {
+      const newH = Number((newW / obj.aspect).toFixed(1));
+      obj.height = newH;
+      if (imgHeightSlider) imgHeightSlider.value = newH;
+      if (imgHeightVal) imgHeightVal.textContent = `${newH}m`;
+    }
+
+    updateSelectedImage3D(true);
+  });
+}
+
+if (imgHeightSlider) {
+  imgHeightSlider.addEventListener('input', (e) => {
+    const obj = getSelectedImage3D();
+    if (!obj) return;
+    const newH = Number(e.target.value);
+    obj.height = newH;
+    if (imgHeightVal) imgHeightVal.textContent = `${newH.toFixed(1)}m`;
+
+    if (imageAspectLock && imageAspectLock.checked && obj.aspect) {
+      const newW = Number((newH * obj.aspect).toFixed(1));
+      obj.width = newW;
+      if (imgWidthSlider) imgWidthSlider.value = newW;
+      if (imgWidthVal) imgWidthVal.textContent = `${newW}m`;
+    }
+
+    updateSelectedImage3D(true);
+  });
+}
+
+if (imgDepthSlider) {
+  imgDepthSlider.addEventListener('input', (e) => {
+    const obj = getSelectedImage3D();
+    if (!obj) return;
+    obj.depth = Number(e.target.value);
+    if (imgDepthVal) imgDepthVal.textContent = `${obj.depth.toFixed(1)}m`;
+    updateSelectedImage3D(true);
+  });
+}
+
+if (imgTransparencySlider) {
+  imgTransparencySlider.addEventListener('input', (e) => {
+    const obj = getSelectedImage3D();
+    if (!obj) return;
+    obj.transparency = Number(e.target.value);
+    if (imgTransparencyVal) imgTransparencyVal.textContent = `${obj.transparency}%`;
+    updateSelectedImage3D(false);
+  });
+}
+
+if (imgReflectionSlider) {
+  imgReflectionSlider.addEventListener('input', (e) => {
+    const obj = getSelectedImage3D();
+    if (!obj) return;
+    obj.reflection = Number(e.target.value);
+    if (imgReflectionVal) imgReflectionVal.textContent = `${obj.reflection}%`;
+    updateSelectedImage3D(false);
+  });
+}
+
+if (imgPosXSlider) {
+  imgPosXSlider.addEventListener('input', (e) => {
+    const obj = getSelectedImage3D();
+    if (!obj) return;
+    obj.position.x = Number(e.target.value);
+    if (imgPosXVal) imgPosXVal.textContent = `${obj.position.x}m`;
+    updateSelectedImage3D(false);
+  });
+}
+
+if (imgPosYSlider) {
+  imgPosYSlider.addEventListener('input', (e) => {
+    const obj = getSelectedImage3D();
+    if (!obj) return;
+    obj.position.y = Number(e.target.value);
+    if (imgPosYVal) imgPosYVal.textContent = `${obj.position.y}m`;
+    updateSelectedImage3D(false);
+  });
+}
+
+if (imgPosZSlider) {
+  imgPosZSlider.addEventListener('input', (e) => {
+    const obj = getSelectedImage3D();
+    if (!obj) return;
+    obj.position.z = Number(e.target.value);
+    if (imgPosZVal) imgPosZVal.textContent = `${obj.position.z}m`;
+    updateSelectedImage3D(false);
+  });
+}
+
+if (imgRotYSlider) {
+  imgRotYSlider.addEventListener('input', (e) => {
+    const obj = getSelectedImage3D();
+    if (!obj) return;
+    obj.rotationY = Number(e.target.value);
+    if (imgRotYVal) imgRotYVal.textContent = `${obj.rotationY}°`;
+    updateSelectedImage3D(false);
+  });
+}
+
+attachSliderHistory(imgWidthSlider);
+attachSliderHistory(imgHeightSlider);
+attachSliderHistory(imgDepthSlider);
+attachSliderHistory(imgTransparencySlider);
+attachSliderHistory(imgReflectionSlider);
+attachSliderHistory(imgPosXSlider);
+attachSliderHistory(imgPosYSlider);
+attachSliderHistory(imgPosZSlider);
+attachSliderHistory(imgRotYSlider);
+
+// Header toggle collapse
+if (imageStudioToggleBtn && imageStudioPanel) {
+  const toggleImageStudio = () => {
+    imageStudioPanel.classList.toggle('collapsed');
+    imageStudioToggleBtn.textContent = imageStudioPanel.classList.contains('collapsed') ? '🖼️' : '−';
+  };
+
+  imageStudioToggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleImageStudio();
+  });
+
+  if (imageStudioHeader) {
+    imageStudioHeader.addEventListener('click', () => {
+      if (imageStudioPanel.classList.contains('collapsed')) {
+        toggleImageStudio();
+      }
+    });
+  }
+}
