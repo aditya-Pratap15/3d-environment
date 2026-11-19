@@ -642,6 +642,8 @@ const resetBtn = document.getElementById('btn-reset-target');
 const deleteTargetBtn = document.getElementById('btn-delete-target');
 const btnUndo = document.getElementById('btn-undo');
 const btnRedo = document.getElementById('btn-redo');
+const btnAddBuilding = document.getElementById('btn-add-building');
+const btnAddMountain = document.getElementById('btn-add-mountain');
 const duplicateStatus = document.getElementById('duplicate-status');
 const mountainStyleSelect = document.getElementById('mountain-style-select');
 const studioPanel = document.getElementById('studio-panel');
@@ -1080,6 +1082,84 @@ attachSliderHistory(posZSlider);
 attachSliderHistory(rotYSlider);
 attachSliderHistory(brightnessSlider);
 attachSliderHistory(skySpeedSlider);
+
+// Add Building / Mountain logic (Supports adding even if main was deleted)
+let buildingAddCount = 0;
+let mountainAddCount = 0;
+
+function addNewObject(type) {
+  if (!buildingsGroup || !mountainGroup) return;
+
+  pushHistoryState();
+
+  const isBuilding = type === 'buildings';
+  const srcProto = isBuilding ? buildingsGroup : mountainGroup;
+  const count = isBuilding ? ++buildingAddCount : ++mountainAddCount;
+  const typeLabel = isBuilding ? '🏙️ Buildings' : '⛰️ Mountains';
+
+  // Check if base main group of this type is currently absent from scene
+  const basePresent = objectsRegistry.some((o) => !o.isClone && o.type === type);
+
+  let newGroup;
+  let isClone;
+  let newId;
+  let newBasePos;
+
+  if (!basePresent) {
+    newGroup = srcProto;
+    if (!scene.children.includes(newGroup)) scene.add(newGroup);
+    isClone = false;
+    newId = isBuilding ? 'buildings_0' : 'mountains_0';
+    newBasePos = baseModelPos.clone();
+  } else {
+    newGroup = srcProto.clone(true);
+    newBasePos = baseModelPos.clone();
+    newBasePos.x += (count % 3 === 0 ? 80 : count % 3 === 1 ? -80 : 0);
+    newBasePos.z += (count % 2 === 0 ? 40 : -40);
+    newGroup.position.copy(newBasePos);
+    newGroup.rotation.copy(srcProto.rotation);
+    scene.add(newGroup);
+    isClone = true;
+    newId = `${type}_added_${Date.now()}_${Math.random()}`;
+  }
+
+  const objName = isClone ? `${typeLabel} (Clone #${count})` : `${typeLabel} (Main)`;
+
+  const entry = {
+    id: newId,
+    type: type,
+    name: objName,
+    isClone: isClone,
+    group: newGroup,
+    basePos: newBasePos.clone(),
+    offset: { x: 0, y: 0, z: 0, rotY: 0 },
+  };
+
+  objectsRegistry.push(entry);
+  selectedObjectId = newId;
+
+  updateObjectSelectOptions();
+  updateSliderUI();
+
+  if (duplicateStatus) {
+    duplicateStatus.textContent = `✓ ${objName} added! Use sliders to move.`;
+    setTimeout(() => {
+      if (duplicateStatus) duplicateStatus.textContent = '';
+    }, 4500);
+  }
+}
+
+if (btnAddBuilding) {
+  btnAddBuilding.addEventListener('click', () => {
+    addNewObject('buildings');
+  });
+}
+
+if (btnAddMountain) {
+  btnAddMountain.addEventListener('click', () => {
+    addNewObject('mountains');
+  });
+}
 
 // Duplicate Object logic (Instantly selectable and movable)
 const cloneCounters = { buildings: 0, mountains: 0 };
