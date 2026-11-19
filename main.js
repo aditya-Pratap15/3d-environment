@@ -625,14 +625,14 @@ const defaultPresets = {
   default: {
     name: 'Default Daytime',
     builtIn: true,
-    brightness: 85,
+    brightness: 57,
     skySpeed: 35,
     skyDirection: 'E_W',
     groundType: 'grass',
     mountainStyle: 'natural',
     camera: {
-      position: { x: 130, y: 80, z: 160 },
-      target: { x: 0, y: 15, z: 0 },
+      position: { x: 3.5, y: 1.2, z: 147.5 },
+      target: { x: 19.1, y: -1.6, z: 5 },
     },
     objects: [
       { id: 'buildings_0', type: 'buildings', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 0 } },
