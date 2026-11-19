@@ -7,6 +7,10 @@
     "skyDirection": "E_W",
     "groundType": "grass",
     "mountainStyle": "natural",
+    "camera": {
+      "position": { "x": 130, "y": 80, "z": 160 },
+      "target": { "x": 0, "y": 15, "z": 0 }
+    },
     "objects": [
       {
         "id": "buildings_0",
@@ -40,6 +44,10 @@
     "skyDirection": "NW_SE",
     "groundType": "autumn",
     "mountainStyle": "canyon",
+    "camera": {
+      "position": { "x": -160, "y": 95, "z": 140 },
+      "target": { "x": 0, "y": 15, "z": 0 }
+    },
     "objects": [
       {
         "id": "buildings_0",
@@ -73,6 +81,10 @@
     "skyDirection": "NE_SW",
     "groundType": "hexgrid",
     "mountainStyle": "lava",
+    "camera": {
+      "position": { "x": 90, "y": 40, "z": 110 },
+      "target": { "x": 0, "y": 20, "z": 0 }
+    },
     "objects": [
       {
         "id": "buildings_0",

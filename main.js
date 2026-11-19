@@ -630,6 +630,10 @@ const defaultPresets = {
     skyDirection: 'E_W',
     groundType: 'grass',
     mountainStyle: 'natural',
+    camera: {
+      position: { x: 130, y: 80, z: 160 },
+      target: { x: 0, y: 15, z: 0 },
+    },
     objects: [
       { id: 'buildings_0', type: 'buildings', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 0 } },
       { id: 'mountains_0', type: 'mountains', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 0 } },
@@ -643,6 +647,10 @@ const defaultPresets = {
     skyDirection: 'NW_SE',
     groundType: 'autumn',
     mountainStyle: 'canyon',
+    camera: {
+      position: { x: -160, y: 95, z: 140 },
+      target: { x: 0, y: 15, z: 0 },
+    },
     objects: [
       { id: 'buildings_0', type: 'buildings', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 0 } },
       { id: 'mountains_0', type: 'mountains', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 0 } },
@@ -656,6 +664,10 @@ const defaultPresets = {
     skyDirection: 'NE_SW',
     groundType: 'hexgrid',
     mountainStyle: 'lava',
+    camera: {
+      position: { x: 90, y: 40, z: 110 },
+      target: { x: 0, y: 20, z: 0 },
+    },
     objects: [
       { id: 'buildings_0', type: 'buildings', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 25 } },
       { id: 'mountains_0', type: 'mountains', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 0 } },
@@ -1047,6 +1059,15 @@ function applyPreset(key) {
   updateObjectSelectOptions();
   updateSliderUI();
 
+  // 7. Camera Viewpoint & Angle
+  if (p.camera && p.camera.position) {
+    camera.position.set(p.camera.position.x, p.camera.position.y, p.camera.position.z);
+    if (p.camera.target && controls) {
+      controls.target.set(p.camera.target.x, p.camera.target.y, p.camera.target.z);
+    }
+    controls.update();
+  }
+
   if (presetStatus) {
     presetStatus.textContent = `Loaded preset: "${p.name}"`;
     setTimeout(() => {
@@ -1079,6 +1100,18 @@ function getCurrentSceneConfig() {
     skyDirection: currentSkyDirection,
     groundType: currentGroundType,
     mountainStyle: mountainStyleSelect?.value ?? 'natural',
+    camera: {
+      position: {
+        x: Number(camera.position.x.toFixed(1)),
+        y: Number(camera.position.y.toFixed(1)),
+        z: Number(camera.position.z.toFixed(1)),
+      },
+      target: {
+        x: Number(controls.target.x.toFixed(1)),
+        y: Number(controls.target.y.toFixed(1)),
+        z: Number(controls.target.z.toFixed(1)),
+      },
+    },
     objects: currentObjState,
   };
 }
