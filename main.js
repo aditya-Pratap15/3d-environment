@@ -21,7 +21,7 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   2500
 );
-camera.position.set(130, 80, 160);
+camera.position.set(3.5, 1.2, 147.5);
 
 // 3. WebGL Renderer
 const renderer = new THREE.WebGLRenderer({
@@ -43,10 +43,10 @@ pmremGenerator.compileEquirectangularShader();
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
-controls.maxPolarAngle = Math.PI / 2 - 0.02; // Keep camera above ground
-controls.minDistance = 5;
+controls.maxPolarAngle = Math.PI / 2 + 0.08; // Allow ground & street level angles
+controls.minDistance = 2;
 controls.maxDistance = 700;
-controls.target.set(0, 15, 0); // Focus on city center
+controls.target.set(19.1, -1.6, 5); // Focus on active vista
 
 // 5. Lighting
 const hemiLight = new THREE.HemisphereLight(0xffffff, 0x64748b, 1.2);
@@ -475,8 +475,9 @@ if (btnDay) {
   });
 }
 
-// Initial brightness setup (85% daylight)
-setBrightnessLevel(85);
+// Initial brightness setup (57% daylight matching Default preset)
+setBrightnessLevel(57);
+if (brightnessSlider) brightnessSlider.value = 57;
 
 // 11. Sky & Cloud Rotation Controller (Speed & 3D Direction)
 let skyRotationSpeed = 0.0014; // Visible, smooth natural cloud drift
@@ -950,7 +951,7 @@ async function loadStoredPresets() {
     activePresetKey = savedActive;
   }
   updatePresetDropdown();
-  if (activePresetKey !== 'default' && presetsData[activePresetKey]) {
+  if (presetsData[activePresetKey]) {
     applyPreset(activePresetKey);
   }
 }
