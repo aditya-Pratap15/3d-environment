@@ -15,7 +15,7 @@
       }
     }
     </script>
-    <script type="module" crossorigin src="./assets/index-QExKponV.js"></script>
+    <script type="module" crossorigin src="./assets/index-CxOJpSym.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-AKae4A1E.css">
   </head>
   <body>
@@ -286,15 +286,6 @@
           </div>
           <select id="image-object-select" class="studio-select" style="margin-bottom: 6px;"></select>
 
-          <!-- Shape / 3D Style Mode -->
-          <div style="font-size: 10.5px; color: #94a3b8; margin: 4px 0 2px 2px;">
-            <span>📐 3D Volume Mode</span>
-          </div>
-          <select id="image-style-mode" class="studio-select" style="margin-bottom: 8px;">
-            <option value="block">💎 3D Crystal / Glass Plaque</option>
-            <option value="cutout">✂️ 3D Contour Cutout Silhouette</option>
-          </select>
-
           <!-- 3. Size: Width, Height, Depth (Thickness) -->
           <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
@@ -334,12 +325,12 @@
           <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px; margin-top: 6px;">
             <span style="font-size: 11px; font-weight: 700; color: #f8fafc;">✨ Extruded Edge Style</span>
 
-            <!-- Transparency Level -->
-            <div style="font-size: 10px; color: #94a3b8; margin: 3px 0 1px 2px;">Side Transparency Level</div>
-            <div class="slider-row" title="Side transparency: 0% = solid opaque, 100% = crystal glass">
+            <!-- Transparency Level (100% = Hard Opaque, 0% = Complete Transparent) -->
+            <div style="font-size: 10px; color: #94a3b8; margin: 3px 0 1px 2px;">Transparency Level (100% Opaque → 0% Transparent)</div>
+            <div class="slider-row" title="100% = Hard Opaque solid 3D mesh, 0% = Completely Transparent">
               <span class="axis-badge">🫧</span>
-              <input type="range" id="img-transparency-slider" class="styled-slider studio-slider" min="0" max="100" value="40" />
-              <span class="val-display" id="img-transparency-val">40%</span>
+              <input type="range" id="img-transparency-slider" class="styled-slider studio-slider" min="0" max="100" value="100" />
+              <span class="val-display" id="img-transparency-val">100%</span>
             </div>
 
             <!-- Side Reflection / Glossiness -->

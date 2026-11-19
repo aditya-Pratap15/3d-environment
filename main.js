@@ -2128,7 +2128,6 @@ const imageUploadInfo = document.getElementById('image-upload-info');
 const imageObjectCtrls = document.getElementById('image-object-ctrls');
 const imageObjectSelect = document.getElementById('image-object-select');
 const btnDeleteImage = document.getElementById('btn-delete-image');
-const imageStyleMode = document.getElementById('image-style-mode');
 const imageAspectLock = document.getElementById('image-aspect-lock');
 
 const imgWidthSlider = document.getElementById('img-width-slider');
@@ -2248,7 +2247,7 @@ function traceAlphaContour(img, targetWidth, targetHeight) {
 }
 
 function buildImageGeometryAndMaterials(imgObj) {
-  const { img, width, height, depth, transparency, reflection, mode, dataUrl } = imgObj;
+  const { img, width, height, depth, transparency, reflection, dataUrl } = imgObj;
 
   if (!imgObj.texture) {
     imgObj.texture = new THREE.TextureLoader().load(dataUrl);
@@ -2263,23 +2262,28 @@ function buildImageGeometryAndMaterials(imgObj) {
     imgObj.sideTexture.needsUpdate = true;
   }
 
+  // Transparency level: 100% = Hard Opaque Solid (opacity 1.0), 0% = Complete Transparent (opacity 0.0)
+  const alphaOpacity = Math.max(0, Math.min(100, Number(transparency ?? 100))) / 100;
+  const isHardOpaque = alphaOpacity >= 0.99;
+  const glossRoughness = 1.0 - (Math.max(0, Math.min(100, Number(reflection ?? 80))) / 100) * 0.92;
+
   const frontMat = new THREE.MeshStandardMaterial({
     map: imgObj.texture,
-    transparent: true,
-    alphaTest: imgObj.hasAlpha ? 0.05 : 0,
+    transparent: !isHardOpaque || imgObj.hasAlpha,
+    alphaTest: isHardOpaque ? 0.05 : 0.001,
+    opacity: alphaOpacity,
     roughness: 0.25,
     metalness: 0.05,
     side: THREE.DoubleSide,
+    depthWrite: isHardOpaque,
   });
 
   const backMat = frontMat.clone();
 
-  const alphaOpacity = 1.0 - (transparency / 100) * 0.95;
-  const glossRoughness = 1.0 - (reflection / 100) * 0.92;
-
+  // Side extruded 3D mesh material (hard solid opaque when 100% with natural image edge reflections)
   const sideMat = new THREE.MeshPhysicalMaterial({
     map: imgObj.sideTexture,
-    transparent: true,
+    transparent: !isHardOpaque,
     opacity: alphaOpacity,
     roughness: glossRoughness,
     metalness: 0.15,
@@ -2287,7 +2291,7 @@ function buildImageGeometryAndMaterials(imgObj) {
     clearcoat: 1.0,
     clearcoatRoughness: 0.08,
     side: THREE.DoubleSide,
-    depthWrite: alphaOpacity > 0.35,
+    depthWrite: isHardOpaque,
   });
 
   imgObj.frontMat = frontMat;
@@ -2297,16 +2301,13 @@ function buildImageGeometryAndMaterials(imgObj) {
   let geo;
   let materials;
 
-  if (mode === 'cutout' && imgObj.hasAlpha) {
+  if (imgObj.hasAlpha) {
     const shape = traceAlphaContour(img, width, height);
     if (shape) {
       geo = new THREE.ExtrudeGeometry(shape, {
-        depth: depth,
-        bevelEnabled: true,
-        bevelSegments: 2,
+        depth: Math.max(0.05, depth),
+        bevelEnabled: false,
         steps: 1,
-        bevelSize: Math.min(0.2, depth * 0.1),
-        bevelThickness: Math.min(0.2, depth * 0.1),
       });
 
       const pos = geo.attributes.position;
@@ -2341,13 +2342,28 @@ function updateSelectedImage3D(rebuildGeo = true) {
     obj.mesh.geometry = geometry;
     obj.mesh.material = materials;
   } else {
+    const alphaOpacity = Math.max(0, Math.min(100, Number(obj.transparency ?? 100))) / 100;
+    const isHardOpaque = alphaOpacity >= 0.99;
+    const glossRoughness = 1.0 - (Math.max(0, Math.min(100, Number(obj.reflection ?? 80))) / 100) * 0.92;
+
     if (obj.sideMat) {
-      const alphaOpacity = 1.0 - (obj.transparency / 100) * 0.95;
-      const glossRoughness = 1.0 - (obj.reflection / 100) * 0.92;
       obj.sideMat.opacity = alphaOpacity;
+      obj.sideMat.transparent = !isHardOpaque;
+      obj.sideMat.depthWrite = isHardOpaque;
       obj.sideMat.roughness = glossRoughness;
-      obj.sideMat.depthWrite = alphaOpacity > 0.35;
       obj.sideMat.needsUpdate = true;
+    }
+    if (obj.frontMat) {
+      obj.frontMat.opacity = alphaOpacity;
+      obj.frontMat.transparent = !isHardOpaque || obj.hasAlpha;
+      obj.frontMat.depthWrite = isHardOpaque;
+      obj.frontMat.needsUpdate = true;
+    }
+    if (obj.backMat) {
+      obj.backMat.opacity = alphaOpacity;
+      obj.backMat.transparent = !isHardOpaque || obj.hasAlpha;
+      obj.backMat.depthWrite = isHardOpaque;
+      obj.backMat.needsUpdate = true;
     }
   }
 
@@ -2407,8 +2423,6 @@ function updateImageSliderUI() {
 
   if (imgRotYSlider) imgRotYSlider.value = obj.rotationY;
   if (imgRotYVal) imgRotYVal.textContent = `${obj.rotationY}°`;
-
-  if (imageStyleMode) imageStyleMode.value = obj.mode;
 }
 
 let imageCountIndex = 0;
@@ -2446,11 +2460,10 @@ function createImage3DObject(img, dataUrl, fileName) {
     img: img,
     hasAlpha: hasAlpha,
     aspect: aspect,
-    mode: hasAlpha ? 'cutout' : 'block',
     width: Number(baseWidth.toFixed(1)),
     height: Number(baseHeight.toFixed(1)),
     depth: baseDepth,
-    transparency: 40,
+    transparency: 100, // Default: 100% HARD OPAQUE SOLID 3D MESH!
     reflection: 80,
     position: { x: 0, y: Number((baseHeight / 2 + 2).toFixed(1)), z: 35 },
     rotationY: 0,
@@ -2528,17 +2541,6 @@ if (btnDeleteImage) {
     selectedImageId = image3dRegistry.length > 0 ? image3dRegistry[0].id : null;
     updateImageSelectOptions();
     updateImageSliderUI();
-  });
-}
-
-if (imageStyleMode) {
-  imageStyleMode.addEventListener('change', (e) => {
-    const obj = getSelectedImage3D();
-    if (obj) {
-      if (typeof pushHistoryState === 'function') pushHistoryState();
-      obj.mode = e.target.value;
-      updateSelectedImage3D(true);
-    }
   });
 }
 
