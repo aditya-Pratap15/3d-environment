@@ -3156,9 +3156,9 @@ function createCuboid3DObject(customOptions = {}) {
     texture: null,
     textureDataUrl: null,
     position: customOptions.position || {
-      x: 0,
+      x: 5,
       y: Number((defaultHeight / 2).toFixed(1)),
-      z: 25,
+      z: 115,
     },
     rotation: customOptions.rotation || { x: 0, y: 25, z: 0 },
     group: new THREE.Group(),
@@ -3204,7 +3204,18 @@ if (cuboidStudioToggleBtn && cuboidStudioPanel) {
 
 if (btnAddCuboid) {
   btnAddCuboid.addEventListener('click', () => {
-    createCuboid3DObject();
+    const offsetIndex = cuboid3dRegistry.length;
+    createCuboid3DObject({
+      position: {
+        x: 5 + (offsetIndex % 5) * 14,
+        y: 3,
+        z: 115 - Math.floor(offsetIndex / 5) * 12,
+      },
+    });
+    if (cuboidStudioPanel && cuboidStudioPanel.classList.contains('collapsed')) {
+      cuboidStudioPanel.classList.remove('collapsed');
+      if (cuboidStudioToggleBtn) cuboidStudioToggleBtn.textContent = '−';
+    }
   });
 }
 
@@ -3251,7 +3262,10 @@ if (cuboidHeightSlider) {
     const c = getSelectedCuboid();
     if (!c) return;
     c.height = parseFloat(e.target.value);
+    c.position.y = Number((c.height / 2).toFixed(1));
     if (cuboidHeightVal) cuboidHeightVal.textContent = `${c.height}m`;
+    if (cuboidPosYSlider) cuboidPosYSlider.value = c.position.y;
+    if (cuboidPosYVal) cuboidPosYVal.textContent = `${c.position.y}m`;
     updateSelectedCuboid(true);
   });
 }
@@ -3431,6 +3445,6 @@ createCuboid3DObject({
   depth: 8,
   smoothness: 15,
   color: '#06b6d4',
-  position: { x: 0, y: 3, z: 25 },
+  position: { x: 5, y: 3, z: 115 },
   rotation: { x: 0, y: 25, z: 0 },
 });

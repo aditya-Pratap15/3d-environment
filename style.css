@@ -1091,13 +1091,6 @@ html, body {
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
-@media (max-width: 1440px) {
-  .cuboid-studio-panel {
-    right: auto;
-    left: 280px;
-  }
-}
-
 @media (max-width: 1100px) {
   .cuboid-studio-panel {
     top: 68px;
@@ -1205,13 +1198,6 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 5px;
-}
-
-@media (max-width: 1440px) {
-  .image-studio-panel {
-    left: auto;
-    right: 250px;
-  }
 }
 
 @media (max-width: 1100px) {
