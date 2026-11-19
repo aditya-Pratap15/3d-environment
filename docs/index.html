@@ -15,8 +15,8 @@
       }
     }
     </script>
-    <script type="module" crossorigin src="./assets/index-pmmfPVhV.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CXe1kC8j.css">
+    <script type="module" crossorigin src="./assets/index-Bu_0MLsY.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BYl-wO0v.css">
   </head>
   <body>
     <!-- Fullscreen 3D Canvas -->
@@ -190,6 +190,152 @@
             <span class="axis-badge">🌑</span>
             <input type="range" id="shadow-darkness-slider" class="styled-slider studio-slider" min="0" max="100" value="65" />
             <span class="val-display" id="shadow-darkness-val">65%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top 3D Cuboid Studio Panel (Left Side of Record Box) -->
+    <div class="cuboid-studio-panel collapsed" id="cuboid-studio-panel">
+      <!-- Header with Toggle Button -->
+      <div class="cuboid-studio-header" id="cuboid-studio-header">
+        <div class="cuboid-studio-title">
+          <span>📦</span>
+          <span>3D Cuboid Studio</span>
+        </div>
+        <button class="cuboid-studio-toggle-btn" id="cuboid-studio-toggle-btn" title="Toggle 3D Cuboid Studio" aria-label="Toggle 3D Cuboid Studio">📦</button>
+      </div>
+
+      <!-- Scrollable Body with Controls -->
+      <div class="cuboid-studio-body" id="cuboid-studio-body">
+        <!-- 1. Add / Select Cuboid Section -->
+        <div class="cuboid-studio-section">
+          <button class="studio-btn primary" id="btn-add-cuboid" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600;" title="Spawn a new 3D Cuboid in the scene">
+            <span>➕</span>
+            <span>Add New Cuboid</span>
+          </button>
+          <div id="cuboid-status-info" style="font-size: 10.5px; color: #94a3b8; text-align: center; margin-top: 2px;"></div>
+        </div>
+
+        <!-- 2. Active Cuboid Controls -->
+        <div class="cuboid-studio-section" id="cuboid-object-ctrls">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label class="section-label" style="margin: 0;">Active Cuboid</label>
+            <button class="studio-btn danger" id="btn-delete-cuboid" style="padding: 2px 8px; font-size: 10.5px;" title="Delete this cuboid from scene">🗑️ Delete</button>
+          </div>
+          <select id="cuboid-select" class="styled-select" style="width: 100%; margin-bottom: 6px;"></select>
+
+          <!-- Dimensions (Width, Height, Breadth/Depth) -->
+          <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px; margin-top: 3px;">
+            <span style="font-size: 11px; font-weight: 700; color: #f8fafc;">📏 Dimensions (Cuboid)</span>
+
+            <!-- Width (X) -->
+            <div style="font-size: 10px; color: #94a3b8; margin: 3px 0 1px 2px;">Width (X)</div>
+            <div class="slider-row">
+              <span class="axis-badge">W</span>
+              <input type="range" id="cuboid-width-slider" class="styled-slider studio-slider" min="0.5" max="100" step="0.5" value="12" />
+              <span class="val-display" id="cuboid-width-val">12m</span>
+            </div>
+
+            <!-- Height (Y) -->
+            <div style="font-size: 10px; color: #94a3b8; margin: 3px 0 1px 2px;">Height (Y)</div>
+            <div class="slider-row">
+              <span class="axis-badge">H</span>
+              <input type="range" id="cuboid-height-slider" class="styled-slider studio-slider" min="0.5" max="100" step="0.5" value="6" />
+              <span class="val-display" id="cuboid-height-val">6m</span>
+            </div>
+
+            <!-- Breadth / Depth (Z) -->
+            <div style="font-size: 10px; color: #94a3b8; margin: 3px 0 1px 2px;">Breadth / Depth (Z)</div>
+            <div class="slider-row">
+              <span class="axis-badge">D</span>
+              <input type="range" id="cuboid-depth-slider" class="styled-slider studio-slider" min="0.5" max="100" step="0.5" value="8" />
+              <span class="val-display" id="cuboid-depth-val">8m</span>
+            </div>
+          </div>
+
+          <!-- Border Smoothness -->
+          <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px; margin-top: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 11px; font-weight: 700; color: #f8fafc;">⭕ Border Smoothness</span>
+            </div>
+            <div style="font-size: 10px; color: #94a3b8; margin: 3px 0 1px 2px;">Corner & Edge Fillet (0% Sharp → 100% Round)</div>
+            <div class="slider-row" title="0% = Sharp rectangular cuboid edges, 100% = Maximum smooth curved fillet">
+              <span class="axis-badge">S</span>
+              <input type="range" id="cuboid-smoothness-slider" class="styled-slider studio-slider" min="0" max="100" value="15" />
+              <span class="val-display" id="cuboid-smoothness-val">15%</span>
+            </div>
+          </div>
+
+          <!-- Color & Image Texture Appearance -->
+          <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px; margin-top: 6px;">
+            <span style="font-size: 11px; font-weight: 700; color: #f8fafc;">🎨 Color & Texture</span>
+
+            <!-- 5 Trending Colors -->
+            <div style="font-size: 10px; color: #94a3b8; margin: 3px 0 1px 2px;">Trending Color Presets</div>
+            <div class="color-swatches-row">
+              <button type="button" class="color-swatch-btn active" data-color="#06b6d4" style="background: #06b6d4;" title="Cyber Cyan"></button>
+              <button type="button" class="color-swatch-btn" data-color="#8b5cf6" style="background: #8b5cf6;" title="Electric Violet"></button>
+              <button type="button" class="color-swatch-btn" data-color="#f43f5e" style="background: #f43f5e;" title="Sunset Coral"></button>
+              <button type="button" class="color-swatch-btn" data-color="#f59e0b" style="background: #f59e0b;" title="Imperial Gold"></button>
+              <button type="button" class="color-swatch-btn" data-color="#10b981" style="background: #10b981;" title="Emerald Mint"></button>
+            </div>
+
+            <!-- Custom Color Picker -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 5px;">
+              <span style="font-size: 10px; color: #94a3b8;">Custom Color:</span>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <input type="color" id="cuboid-color-picker" value="#06b6d4" style="width: 32px; height: 26px; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 0; background: transparent; cursor: pointer;" />
+                <span id="cuboid-color-hex" style="font-family: monospace; font-size: 11px; color: #e2e8f0;">#06b6d4</span>
+              </div>
+            </div>
+
+            <!-- Image Texture on Faces -->
+            <div style="margin-top: 8px;">
+              <input type="file" id="cuboid-image-input" accept="image/png,image/jpeg,image/webp" style="display: none;" />
+              <button type="button" class="studio-btn" id="btn-upload-cuboid-img" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; margin-bottom: 4px;" title="Wrap a custom image across all cuboid faces">
+                <span>🖼️</span>
+                <span>Wrap Image on Faces</span>
+              </button>
+              <button type="button" class="studio-btn" id="btn-clear-cuboid-img" style="width: 100%; font-size: 10.5px; color: #f87171; display: none;" title="Remove image and revert to solid color">
+                <span>✕ Remove Image (Use Color)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Position & 3D Direction / Angle -->
+          <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px; margin-top: 6px;">
+            <span style="font-size: 11px; font-weight: 700; color: #f8fafc;">📍 Position & Direction</span>
+
+            <div class="slider-row" style="margin-top: 3px;">
+              <span class="axis-badge">X</span>
+              <input type="range" id="cuboid-pos-x-slider" class="styled-slider studio-slider" min="-250" max="250" value="0" />
+              <span class="val-display" id="cuboid-pos-x-val">0m</span>
+            </div>
+
+            <div class="slider-row">
+              <span class="axis-badge">Y</span>
+              <input type="range" id="cuboid-pos-y-slider" class="styled-slider studio-slider" min="0" max="150" value="3" />
+              <span class="val-display" id="cuboid-pos-y-val">3m</span>
+            </div>
+
+            <div class="slider-row">
+              <span class="axis-badge">Z</span>
+              <input type="range" id="cuboid-pos-z-slider" class="styled-slider studio-slider" min="-250" max="250" value="25" />
+              <span class="val-display" id="cuboid-pos-z-val">25m</span>
+            </div>
+
+            <div class="slider-row" title="Rotate Angle / Direction (Yaw)">
+              <span class="axis-badge">⟳</span>
+              <input type="range" id="cuboid-rot-y-slider" class="styled-slider studio-slider" min="0" max="360" value="25" />
+              <span class="val-display" id="cuboid-rot-y-val">25°</span>
+            </div>
+
+            <div class="slider-row" title="Tilt / Pitch">
+              <span class="axis-badge">∠</span>
+              <input type="range" id="cuboid-rot-x-slider" class="styled-slider studio-slider" min="-180" max="180" value="0" />
+              <span class="val-display" id="cuboid-rot-x-val">0°</span>
+            </div>
           </div>
         </div>
       </div>

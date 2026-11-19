@@ -961,6 +961,152 @@ html, body {
   50% { opacity: 0.2; transform: scale(0.8); }
 }
 
+/* Top 3D Cuboid Studio Panel (Left Side of Record Box) */
+.cuboid-studio-panel {
+  position: fixed;
+  top: 18px;
+  right: calc(50% + 158px);
+  z-index: 32;
+  width: 290px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.5), 0 0 24px rgba(139, 92, 246, 0.15);
+  box-sizing: border-box;
+  overflow: hidden;
+  max-height: calc(100vh - 36px);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.25s ease;
+}
+
+.cuboid-studio-panel.collapsed {
+  width: auto;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.88);
+}
+
+.cuboid-studio-panel.collapsed .cuboid-studio-body {
+  display: none;
+}
+
+.cuboid-studio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cuboid-studio-panel.collapsed .cuboid-studio-header {
+  border-bottom: none;
+  padding: 8px 14px;
+}
+
+.cuboid-studio-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: -0.01em;
+}
+
+.cuboid-studio-toggle-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.cuboid-studio-toggle-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.cuboid-studio-body {
+  padding: 10px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  max-height: calc(100vh - 90px);
+}
+
+.cuboid-studio-body::-webkit-scrollbar {
+  width: 4px;
+}
+.cuboid-studio-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cuboid-studio-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 2px;
+}
+
+.cuboid-studio-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.color-swatches-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 4px 0;
+}
+
+.color-swatch-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  padding: 0;
+  outline: none;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.color-swatch-btn:hover {
+  transform: scale(1.18);
+  border-color: #ffffff;
+}
+
+.color-swatch-btn.active {
+  transform: scale(1.18);
+  border-color: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+@media (max-width: 1440px) {
+  .cuboid-studio-panel {
+    right: auto;
+    left: 280px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .cuboid-studio-panel {
+    top: 68px;
+    left: calc(50% - 150px);
+    transform: translateX(-50%);
+    right: auto;
+  }
+}
+
 /* Top 3D Image & Cutout Studio Panel (Beside Record Box) */
 .image-studio-panel {
   position: fixed;

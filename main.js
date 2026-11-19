@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
 // DOM Elements
 const canvas = document.querySelector('#webgl');
@@ -2935,3 +2936,501 @@ if (imageStudioToggleBtn && imageStudioPanel) {
     });
   }
 }
+
+// =====================================================================
+// --- 16. Top 3D Cuboid Studio (Left Side of Record Box) ---
+// =====================================================================
+const cuboidStudioPanel = document.getElementById('cuboid-studio-panel');
+const cuboidStudioToggleBtn = document.getElementById('cuboid-studio-toggle-btn');
+const cuboidStudioHeader = document.getElementById('cuboid-studio-header');
+
+const btnAddCuboid = document.getElementById('btn-add-cuboid');
+const cuboidStatusInfo = document.getElementById('cuboid-status-info');
+const cuboidObjectCtrls = document.getElementById('cuboid-object-ctrls');
+const cuboidSelect = document.getElementById('cuboid-select');
+const btnDeleteCuboid = document.getElementById('btn-delete-cuboid');
+
+const cuboidWidthSlider = document.getElementById('cuboid-width-slider');
+const cuboidWidthVal = document.getElementById('cuboid-width-val');
+const cuboidHeightSlider = document.getElementById('cuboid-height-slider');
+const cuboidHeightVal = document.getElementById('cuboid-height-val');
+const cuboidDepthSlider = document.getElementById('cuboid-depth-slider');
+const cuboidDepthVal = document.getElementById('cuboid-depth-val');
+
+const cuboidSmoothnessSlider = document.getElementById('cuboid-smoothness-slider');
+const cuboidSmoothnessVal = document.getElementById('cuboid-smoothness-val');
+
+const cuboidColorPicker = document.getElementById('cuboid-color-picker');
+const cuboidColorHex = document.getElementById('cuboid-color-hex');
+const cuboidSwatchBtns = document.querySelectorAll('.color-swatch-btn');
+
+const cuboidImageInput = document.getElementById('cuboid-image-input');
+const btnUploadCuboidImg = document.getElementById('btn-upload-cuboid-img');
+const btnClearCuboidImg = document.getElementById('btn-clear-cuboid-img');
+
+const cuboidPosXSlider = document.getElementById('cuboid-pos-x-slider');
+const cuboidPosXVal = document.getElementById('cuboid-pos-x-val');
+const cuboidPosYSlider = document.getElementById('cuboid-pos-y-slider');
+const cuboidPosYVal = document.getElementById('cuboid-pos-y-val');
+const cuboidPosZSlider = document.getElementById('cuboid-pos-z-slider');
+const cuboidPosZVal = document.getElementById('cuboid-pos-z-val');
+
+const cuboidRotYSlider = document.getElementById('cuboid-rot-y-slider');
+const cuboidRotYVal = document.getElementById('cuboid-rot-y-val');
+const cuboidRotXSlider = document.getElementById('cuboid-rot-x-slider');
+const cuboidRotXVal = document.getElementById('cuboid-rot-x-val');
+
+const cuboid3dRegistry = [];
+let selectedCuboidId = null;
+let cuboidCountIndex = 0;
+
+function getSelectedCuboid() {
+  return cuboid3dRegistry.find((c) => c.id === selectedCuboidId) || (cuboid3dRegistry.length > 0 ? cuboid3dRegistry[0] : null);
+}
+
+function buildCuboidGeometry(width, height, depth, smoothnessPercent) {
+  const maxRadius = Math.min(width, height, depth) / 2;
+  const radius = (Math.max(0, Math.min(100, smoothnessPercent)) / 100) * maxRadius * 0.92;
+
+  if (radius <= 0.02) {
+    return new THREE.BoxGeometry(width, height, depth);
+  }
+  return new RoundedBoxGeometry(width, height, depth, 4, radius);
+}
+
+function buildCuboidMesh(cObj) {
+  // Clear any existing child mesh
+  while (cObj.group.children.length > 0) {
+    const child = cObj.group.children[0];
+    if (child.geometry) child.geometry.dispose();
+    cObj.group.remove(child);
+  }
+
+  const geo = buildCuboidGeometry(cObj.width, cObj.height, cObj.depth, cObj.smoothness);
+  geo.computeVertexNormals();
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: cObj.texture ? 0xffffff : new THREE.Color(cObj.color),
+    map: cObj.texture || null,
+    roughness: 0.28,
+    metalness: 0.12,
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+
+  cObj.mesh = mesh;
+  cObj.material = mat;
+  cObj.group.add(mesh);
+
+  cObj.group.position.set(cObj.position.x, cObj.position.y, cObj.position.z);
+  cObj.group.rotation.set(
+    (cObj.rotation.x * Math.PI) / 180,
+    (cObj.rotation.y * Math.PI) / 180,
+    (cObj.rotation.z * Math.PI) / 180
+  );
+
+  prepareMeshShadows(cObj.group);
+}
+
+function updateSelectedCuboid(rebuildGeo = true) {
+  const cObj = getSelectedCuboid();
+  if (!cObj || !cObj.group) return;
+
+  if (rebuildGeo) {
+    buildCuboidMesh(cObj);
+  } else {
+    // Fast update for color/material/transform
+    if (cObj.material) {
+      if (cObj.texture) {
+        cObj.material.map = cObj.texture;
+        cObj.material.color.set(0xffffff);
+      } else {
+        cObj.material.map = null;
+        cObj.material.color.set(cObj.color);
+      }
+      cObj.material.needsUpdate = true;
+    }
+    cObj.group.position.set(cObj.position.x, cObj.position.y, cObj.position.z);
+    cObj.group.rotation.set(
+      (cObj.rotation.x * Math.PI) / 180,
+      (cObj.rotation.y * Math.PI) / 180,
+      (cObj.rotation.z * Math.PI) / 180
+    );
+  }
+}
+
+function updateCuboidSelectOptions() {
+  if (!cuboidSelect) return;
+  cuboidSelect.innerHTML = '';
+
+  if (cuboid3dRegistry.length === 0) {
+    if (cuboidObjectCtrls) cuboidObjectCtrls.style.display = 'none';
+    if (cuboidStatusInfo) cuboidStatusInfo.textContent = 'No active cuboids. Click "+ Add New Cuboid" above!';
+    return;
+  }
+
+  if (cuboidObjectCtrls) cuboidObjectCtrls.style.display = 'block';
+  if (cuboidStatusInfo) cuboidStatusInfo.textContent = '';
+
+  cuboid3dRegistry.forEach((c) => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    if (c.id === selectedCuboidId) opt.selected = true;
+    cuboidSelect.appendChild(opt);
+  });
+}
+
+function updateCuboidSliderUI() {
+  const c = getSelectedCuboid();
+  if (!c) return;
+
+  if (cuboidWidthSlider) cuboidWidthSlider.value = c.width;
+  if (cuboidWidthVal) cuboidWidthVal.textContent = `${c.width}m`;
+
+  if (cuboidHeightSlider) cuboidHeightSlider.value = c.height;
+  if (cuboidHeightVal) cuboidHeightVal.textContent = `${c.height}m`;
+
+  if (cuboidDepthSlider) cuboidDepthSlider.value = c.depth;
+  if (cuboidDepthVal) cuboidDepthVal.textContent = `${c.depth}m`;
+
+  if (cuboidSmoothnessSlider) cuboidSmoothnessSlider.value = c.smoothness;
+  if (cuboidSmoothnessVal) {
+    const s = c.smoothness;
+    cuboidSmoothnessVal.textContent = s === 0 ? '0% (Sharp)' : `${s}%`;
+  }
+
+  if (cuboidColorPicker) cuboidColorPicker.value = c.color;
+  if (cuboidColorHex) cuboidColorHex.textContent = c.color.toUpperCase();
+
+  // Swatches active class
+  cuboidSwatchBtns.forEach((btn) => {
+    if (btn.dataset.color.toLowerCase() === c.color.toLowerCase()) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+
+  // Texture controls
+  if (btnClearCuboidImg) {
+    btnClearCuboidImg.style.display = c.texture ? 'block' : 'none';
+  }
+
+  if (cuboidPosXSlider) cuboidPosXSlider.value = c.position.x;
+  if (cuboidPosXVal) cuboidPosXVal.textContent = `${c.position.x}m`;
+
+  if (cuboidPosYSlider) cuboidPosYSlider.value = c.position.y;
+  if (cuboidPosYVal) cuboidPosYVal.textContent = `${c.position.y}m`;
+
+  if (cuboidPosZSlider) cuboidPosZSlider.value = c.position.z;
+  if (cuboidPosZVal) cuboidPosZVal.textContent = `${c.position.z}m`;
+
+  if (cuboidRotYSlider) cuboidRotYSlider.value = c.rotation.y;
+  if (cuboidRotYVal) cuboidRotYVal.textContent = `${c.rotation.y}°`;
+
+  if (cuboidRotXSlider) cuboidRotXSlider.value = c.rotation.x;
+  if (cuboidRotXVal) cuboidRotXVal.textContent = `${c.rotation.x}°`;
+}
+
+function createCuboid3DObject(customOptions = {}) {
+  if (typeof pushHistoryState === 'function') pushHistoryState();
+
+  cuboidCountIndex++;
+  const id = `cuboid_${Date.now()}_${cuboidCountIndex}`;
+
+  const defaultWidth = customOptions.width || 12;
+  const defaultHeight = customOptions.height || 6;
+  const defaultDepth = customOptions.depth || 8;
+
+  const newCuboid = {
+    id: id,
+    name: `📦 Cuboid #${cuboidCountIndex}`,
+    width: defaultWidth,
+    height: defaultHeight,
+    depth: defaultDepth,
+    smoothness: customOptions.smoothness !== undefined ? customOptions.smoothness : 15,
+    color: customOptions.color || '#06b6d4',
+    texture: null,
+    textureDataUrl: null,
+    position: customOptions.position || {
+      x: 0,
+      y: Number((defaultHeight / 2).toFixed(1)),
+      z: 25,
+    },
+    rotation: customOptions.rotation || { x: 0, y: 25, z: 0 },
+    group: new THREE.Group(),
+  };
+
+  buildCuboidMesh(newCuboid);
+  scene.add(newCuboid.group);
+
+  cuboid3dRegistry.push(newCuboid);
+  selectedCuboidId = id;
+
+  updateCuboidSelectOptions();
+  updateCuboidSliderUI();
+
+  if (cuboidStatusInfo) {
+    cuboidStatusInfo.textContent = `✓ "${newCuboid.name}" spawned in 3D!`;
+    setTimeout(() => {
+      if (cuboidStatusInfo) cuboidStatusInfo.textContent = '';
+    }, 3500);
+  }
+
+  return newCuboid;
+}
+
+// Toggle Cuboid Studio Panel
+if (cuboidStudioToggleBtn && cuboidStudioPanel) {
+  const toggleCuboidStudio = () => {
+    cuboidStudioPanel.classList.toggle('collapsed');
+    cuboidStudioToggleBtn.textContent = cuboidStudioPanel.classList.contains('collapsed') ? '📦' : '−';
+  };
+
+  cuboidStudioToggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleCuboidStudio();
+  });
+
+  if (cuboidStudioHeader) {
+    cuboidStudioHeader.addEventListener('click', () => {
+      toggleCuboidStudio();
+    });
+  }
+}
+
+if (btnAddCuboid) {
+  btnAddCuboid.addEventListener('click', () => {
+    createCuboid3DObject();
+  });
+}
+
+if (cuboidSelect) {
+  cuboidSelect.addEventListener('change', (e) => {
+    selectedCuboidId = e.target.value;
+    updateCuboidSliderUI();
+  });
+}
+
+if (btnDeleteCuboid) {
+  btnDeleteCuboid.addEventListener('click', () => {
+    const idx = cuboid3dRegistry.findIndex((c) => c.id === selectedCuboidId);
+    if (idx === -1) return;
+
+    if (typeof pushHistoryState === 'function') pushHistoryState();
+
+    const cObj = cuboid3dRegistry[idx];
+    scene.remove(cObj.group);
+    if (cObj.mesh && cObj.mesh.geometry) cObj.mesh.geometry.dispose();
+    if (cObj.material) cObj.material.dispose();
+
+    cuboid3dRegistry.splice(idx, 1);
+    selectedCuboidId = cuboid3dRegistry.length > 0 ? cuboid3dRegistry[0].id : null;
+
+    updateCuboidSelectOptions();
+    updateCuboidSliderUI();
+  });
+}
+
+// Width, Height, Depth Sliders
+if (cuboidWidthSlider) {
+  cuboidWidthSlider.addEventListener('input', (e) => {
+    const c = getSelectedCuboid();
+    if (!c) return;
+    c.width = parseFloat(e.target.value);
+    if (cuboidWidthVal) cuboidWidthVal.textContent = `${c.width}m`;
+    updateSelectedCuboid(true);
+  });
+}
+
+if (cuboidHeightSlider) {
+  cuboidHeightSlider.addEventListener('input', (e) => {
+    const c = getSelectedCuboid();
+    if (!c) return;
+    c.height = parseFloat(e.target.value);
+    if (cuboidHeightVal) cuboidHeightVal.textContent = `${c.height}m`;
+    updateSelectedCuboid(true);
+  });
+}
+
+if (cuboidDepthSlider) {
+  cuboidDepthSlider.addEventListener('input', (e) => {
+    const c = getSelectedCuboid();
+    if (!c) return;
+    c.depth = parseFloat(e.target.value);
+    if (cuboidDepthVal) cuboidDepthVal.textContent = `${c.depth}m`;
+    updateSelectedCuboid(true);
+  });
+}
+
+// Border Smoothness Slider
+if (cuboidSmoothnessSlider) {
+  cuboidSmoothnessSlider.addEventListener('input', (e) => {
+    const c = getSelectedCuboid();
+    if (!c) return;
+    c.smoothness = parseInt(e.target.value, 10);
+    if (cuboidSmoothnessVal) {
+      cuboidSmoothnessVal.textContent = c.smoothness === 0 ? '0% (Sharp)' : `${c.smoothness}%`;
+    }
+    updateSelectedCuboid(true);
+  });
+}
+
+// Custom Color Picker
+if (cuboidColorPicker) {
+  cuboidColorPicker.addEventListener('input', (e) => {
+    const c = getSelectedCuboid();
+    if (!c) return;
+    c.color = e.target.value;
+    c.texture = null; // revert from image to solid color
+    if (cuboidColorHex) cuboidColorHex.textContent = c.color.toUpperCase();
+    cuboidSwatchBtns.forEach((b) => b.classList.remove('active'));
+    if (btnClearCuboidImg) btnClearCuboidImg.style.display = 'none';
+    updateSelectedCuboid(false);
+  });
+}
+
+// 5 Trending Colors
+cuboidSwatchBtns.forEach((btn) => {
+  btn.addEventListener('click', (e) => {
+    const color = e.target.dataset.color;
+    if (!color) return;
+    const c = getSelectedCuboid();
+    if (!c) return;
+
+    if (typeof pushHistoryState === 'function') pushHistoryState();
+
+    c.color = color;
+    c.texture = null;
+    if (cuboidColorPicker) cuboidColorPicker.value = color;
+    if (cuboidColorHex) cuboidColorHex.textContent = color.toUpperCase();
+
+    cuboidSwatchBtns.forEach((b) => b.classList.remove('active'));
+    e.target.classList.add('active');
+
+    if (btnClearCuboidImg) btnClearCuboidImg.style.display = 'none';
+    updateSelectedCuboid(false);
+  });
+});
+
+// Image Upload on Faces
+if (btnUploadCuboidImg && cuboidImageInput) {
+  btnUploadCuboidImg.addEventListener('click', () => {
+    cuboidImageInput.click();
+  });
+
+  cuboidImageInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target.result;
+      const texture = new THREE.TextureLoader().load(dataUrl, () => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        const c = getSelectedCuboid();
+        if (!c) return;
+
+        if (typeof pushHistoryState === 'function') pushHistoryState();
+
+        c.texture = texture;
+        c.textureDataUrl = dataUrl;
+        if (btnClearCuboidImg) btnClearCuboidImg.style.display = 'block';
+        updateSelectedCuboid(false);
+      });
+    };
+    reader.readAsDataURL(file);
+    cuboidImageInput.value = '';
+  });
+}
+
+// Clear Image
+if (btnClearCuboidImg) {
+  btnClearCuboidImg.addEventListener('click', () => {
+    const c = getSelectedCuboid();
+    if (!c) return;
+
+    if (typeof pushHistoryState === 'function') pushHistoryState();
+
+    c.texture = null;
+    c.textureDataUrl = null;
+    btnClearCuboidImg.style.display = 'none';
+    updateSelectedCuboid(false);
+  });
+}
+
+// Transform Sliders (Position & Rotation)
+if (cuboidPosXSlider) {
+  cuboidPosXSlider.addEventListener('input', (e) => {
+    const c = getSelectedCuboid();
+    if (!c) return;
+    c.position.x = parseFloat(e.target.value);
+    if (cuboidPosXVal) cuboidPosXVal.textContent = `${c.position.x}m`;
+    updateSelectedCuboid(false);
+  });
+}
+
+if (cuboidPosYSlider) {
+  cuboidPosYSlider.addEventListener('input', (e) => {
+    const c = getSelectedCuboid();
+    if (!c) return;
+    c.position.y = parseFloat(e.target.value);
+    if (cuboidPosYVal) cuboidPosYVal.textContent = `${c.position.y}m`;
+    updateSelectedCuboid(false);
+  });
+}
+
+if (cuboidPosZSlider) {
+  cuboidPosZSlider.addEventListener('input', (e) => {
+    const c = getSelectedCuboid();
+    if (!c) return;
+    c.position.z = parseFloat(e.target.value);
+    if (cuboidPosZVal) cuboidPosZVal.textContent = `${c.position.z}m`;
+    updateSelectedCuboid(false);
+  });
+}
+
+if (cuboidRotYSlider) {
+  cuboidRotYSlider.addEventListener('input', (e) => {
+    const c = getSelectedCuboid();
+    if (!c) return;
+    c.rotation.y = parseFloat(e.target.value);
+    if (cuboidRotYVal) cuboidRotYVal.textContent = `${c.rotation.y}°`;
+    updateSelectedCuboid(false);
+  });
+}
+
+if (cuboidRotXSlider) {
+  cuboidRotXSlider.addEventListener('input', (e) => {
+    const c = getSelectedCuboid();
+    if (!c) return;
+    c.rotation.x = parseFloat(e.target.value);
+    if (cuboidRotXVal) cuboidRotXVal.textContent = `${c.rotation.x}°`;
+    updateSelectedCuboid(false);
+  });
+}
+
+// Slider Undo History Attachments
+attachSliderHistory(cuboidWidthSlider);
+attachSliderHistory(cuboidHeightSlider);
+attachSliderHistory(cuboidDepthSlider);
+attachSliderHistory(cuboidSmoothnessSlider);
+attachSliderHistory(cuboidPosXSlider);
+attachSliderHistory(cuboidPosYSlider);
+attachSliderHistory(cuboidPosZSlider);
+attachSliderHistory(cuboidRotYSlider);
+attachSliderHistory(cuboidRotXSlider);
+
+// Spawn an initial default cuboid on startup
+createCuboid3DObject({
+  width: 12,
+  height: 6,
+  depth: 8,
+  smoothness: 15,
+  color: '#06b6d4',
+  position: { x: 0, y: 3, z: 25 },
+  rotation: { x: 0, y: 25, z: 0 },
+});
