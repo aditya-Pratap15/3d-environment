@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
 // DOM Elements
 const canvas = document.querySelector('#webgl');
@@ -2988,6 +2987,109 @@ function getSelectedCuboid() {
   return cuboid3dRegistry.find((c) => c.id === selectedCuboidId) || (cuboid3dRegistry.length > 0 ? cuboid3dRegistry[0] : null);
 }
 
+// Self-contained Rounded Box Geometry generator (zero external module dependencies)
+function createRoundedBoxGeometry(width = 1, height = 1, depth = 1, segments = 2, radius = 0.1) {
+  segments = segments * 2 + 1;
+  radius = Math.min(width / 2, height / 2, depth / 2, radius);
+
+  const boxGeo = new THREE.BoxGeometry(1, 1, 1, segments, segments, segments);
+  if (segments === 1 || radius <= 0.001) return boxGeo;
+
+  const nonIndexed = boxGeo.toNonIndexed();
+  boxGeo.dispose();
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', nonIndexed.attributes.position);
+  geom.setAttribute('normal', nonIndexed.attributes.normal);
+  geom.setAttribute('uv', nonIndexed.attributes.uv);
+
+  const pos = new THREE.Vector3();
+  const norm = new THREE.Vector3();
+  const tempNorm = new THREE.Vector3();
+  const box = new THREE.Vector3(width, height, depth).divideScalar(2).subScalar(radius);
+
+  const positions = geom.attributes.position.array;
+  const normals = geom.attributes.normal.array;
+  const uvs = geom.attributes.uv.array;
+
+  const faceTris = positions.length / 6;
+  const faceDir = new THREE.Vector3();
+  const halfSeg = 0.5 / segments;
+
+  function calcUv(fDir, n, uvAxis, projAxis, r, sideLen) {
+    const totArc = 2 * Math.PI * r / 4;
+    const centerLen = Math.max(sideLen - 2 * r, 0);
+    const halfArc = Math.PI / 4;
+    tempNorm.copy(n);
+    tempNorm[projAxis] = 0;
+    tempNorm.normalize();
+    const arcUvRatio = 0.5 * totArc / (totArc + centerLen);
+    const arcAngleRatio = 1.0 - (tempNorm.angleTo(fDir) / halfArc);
+    if (Math.sign(tempNorm[uvAxis]) === 1) {
+      return arcAngleRatio * arcUvRatio;
+    } else {
+      const lenUv = centerLen / (totArc + centerLen);
+      return lenUv + arcUvRatio + arcUvRatio * (1.0 - arcAngleRatio);
+    }
+  }
+
+  for (let i = 0, j = 0; i < positions.length; i += 3, j += 2) {
+    pos.fromArray(positions, i);
+    norm.copy(pos);
+    norm.x -= Math.sign(norm.x) * halfSeg;
+    norm.y -= Math.sign(norm.y) * halfSeg;
+    norm.z -= Math.sign(norm.z) * halfSeg;
+    norm.normalize();
+
+    positions[i + 0] = box.x * Math.sign(pos.x) + norm.x * radius;
+    positions[i + 1] = box.y * Math.sign(pos.y) + norm.y * radius;
+    positions[i + 2] = box.z * Math.sign(pos.z) + norm.z * radius;
+
+    normals[i + 0] = norm.x;
+    normals[i + 1] = norm.y;
+    normals[i + 2] = norm.z;
+
+    const side = Math.floor(i / faceTris);
+    switch (side) {
+      case 0: // right
+        faceDir.set(1, 0, 0);
+        uvs[j + 0] = calcUv(faceDir, norm, 'z', 'y', radius, depth);
+        uvs[j + 1] = 1.0 - calcUv(faceDir, norm, 'y', 'z', radius, height);
+        break;
+      case 1: // left
+        faceDir.set(-1, 0, 0);
+        uvs[j + 0] = 1.0 - calcUv(faceDir, norm, 'z', 'y', radius, depth);
+        uvs[j + 1] = 1.0 - calcUv(faceDir, norm, 'y', 'z', radius, height);
+        break;
+      case 2: // top
+        faceDir.set(0, 1, 0);
+        uvs[j + 0] = 1.0 - calcUv(faceDir, norm, 'x', 'z', radius, width);
+        uvs[j + 1] = calcUv(faceDir, norm, 'z', 'x', radius, depth);
+        break;
+      case 3: // bottom
+        faceDir.set(0, -1, 0);
+        uvs[j + 0] = 1.0 - calcUv(faceDir, norm, 'x', 'z', radius, width);
+        uvs[j + 1] = 1.0 - calcUv(faceDir, norm, 'z', 'x', radius, depth);
+        break;
+      case 4: // front
+        faceDir.set(0, 0, 1);
+        uvs[j + 0] = 1.0 - calcUv(faceDir, norm, 'x', 'y', radius, width);
+        uvs[j + 1] = 1.0 - calcUv(faceDir, norm, 'y', 'x', radius, height);
+        break;
+      case 5: // back
+        faceDir.set(0, 0, -1);
+        uvs[j + 0] = calcUv(faceDir, norm, 'x', 'y', radius, width);
+        uvs[j + 1] = 1.0 - calcUv(faceDir, norm, 'y', 'x', radius, height);
+        break;
+    }
+  }
+
+  geom.attributes.position.needsUpdate = true;
+  geom.attributes.normal.needsUpdate = true;
+  geom.attributes.uv.needsUpdate = true;
+  return geom;
+}
+
 function buildCuboidGeometry(width, height, depth, smoothnessPercent) {
   const maxRadius = Math.min(width, height, depth) / 2;
   const radius = (Math.max(0, Math.min(100, smoothnessPercent)) / 100) * maxRadius * 0.92;
@@ -2995,7 +3097,7 @@ function buildCuboidGeometry(width, height, depth, smoothnessPercent) {
   if (radius <= 0.02) {
     return new THREE.BoxGeometry(width, height, depth);
   }
-  return new RoundedBoxGeometry(width, height, depth, 4, radius);
+  return createRoundedBoxGeometry(width, height, depth, 4, radius);
 }
 
 function buildCuboidMesh(cObj) {
