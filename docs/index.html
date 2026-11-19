@@ -15,7 +15,7 @@
       }
     }
     </script>
-    <script type="module" crossorigin src="./assets/index-CyVb7j3q.js"></script>
+    <script type="module" crossorigin src="./assets/index-DHzJeLgW.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-DntX75WK.css">
   </head>
   <body>
@@ -146,6 +146,51 @@
             <option value="marble">🏛️ Carrara Marble</option>
             <option value="hexgrid">🔮 Cyberpunk Hex</option>
           </select>
+        </div>
+
+        <!-- Asset Lighting & Shadow Controls (Universal for All Current & Future Assets) -->
+        <div class="studio-section" style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 8px;">
+          <label class="section-label">💡 Asset Lighting & Shadows</label>
+
+          <!-- 1. Sun & Shadow Horizontal Angle -->
+          <div style="font-size: 11px; color: #94a3b8; margin: 4px 0 2px 2px;">
+            <span>☀️ Sun Angle</span>
+          </div>
+          <div class="slider-row" title="Rotate sun angle to cast shadows in any direction (0° to 360°)">
+            <span class="axis-badge">☀️</span>
+            <input type="range" id="sun-angle-slider" class="styled-slider studio-slider" min="0" max="360" value="45" />
+            <span class="val-display" id="sun-angle-val">45°</span>
+          </div>
+
+          <!-- 2. Sun Elevation / Shadow Length -->
+          <div style="font-size: 11px; color: #94a3b8; margin: 4px 0 2px 2px;">
+            <span>📐 Sun Height (Shadow Length)</span>
+          </div>
+          <div class="slider-row" title="Sun height in sky: low sun = long dramatic shadows, high sun = short overhead shadows">
+            <span class="axis-badge">📐</span>
+            <input type="range" id="sun-height-slider" class="styled-slider studio-slider" min="10" max="85" value="50" />
+            <span class="val-display" id="sun-height-val">50°</span>
+          </div>
+
+          <!-- 3. Asset Surface Brightness -->
+          <div style="font-size: 11px; color: #94a3b8; margin: 4px 0 2px 2px;">
+            <span>💡 Asset Brightness</span>
+          </div>
+          <div class="slider-row" title="Direct sunlight illumination on building and mountain facades">
+            <span class="axis-badge">💡</span>
+            <input type="range" id="asset-brightness-slider" class="styled-slider studio-slider" min="0" max="100" value="70" />
+            <span class="val-display" id="asset-brightness-val">70%</span>
+          </div>
+
+          <!-- 4. Shadow Darkness / Density -->
+          <div style="font-size: 11px; color: #94a3b8; margin: 4px 0 2px 2px;">
+            <span>🌑 Shadow Darkness</span>
+          </div>
+          <div class="slider-row" title="Shadow intensity: 0% = soft & translucent, 100% = deep pitch black">
+            <span class="axis-badge">🌑</span>
+            <input type="range" id="shadow-darkness-slider" class="styled-slider studio-slider" min="0" max="100" value="65" />
+            <span class="val-display" id="shadow-darkness-val">65%</span>
+          </div>
         </div>
       </div>
     </div>

@@ -62,17 +62,85 @@ sunLight.castShadow = true;
 sunLight.shadow.mapSize.width = 2048;
 sunLight.shadow.mapSize.height = 2048;
 sunLight.shadow.camera.near = 10;
-sunLight.shadow.camera.far = 700;
-sunLight.shadow.camera.left = -200;
-sunLight.shadow.camera.right = 200;
-sunLight.shadow.camera.top = 200;
-sunLight.shadow.camera.bottom = -200;
+sunLight.shadow.camera.far = 900;
+sunLight.shadow.camera.left = -300;
+sunLight.shadow.camera.right = 300;
+sunLight.shadow.camera.top = 300;
+sunLight.shadow.camera.bottom = -300;
 sunLight.shadow.bias = -0.0003;
 scene.add(sunLight);
+scene.add(sunLight.target);
 
 const fillLight = new THREE.DirectionalLight(0x93c5fd, 0.8);
 fillLight.position.set(-120, 90, -120);
 scene.add(fillLight);
+
+// Universal Asset Lighting & Shadow Controller (Affects all current & future 3D assets)
+let currentSunAngle = 45;        // 0° to 360° horizontal rotation
+let currentSunHeight = 50;       // 10° to 85° elevation
+let currentAssetBrightness = 70; // 0% to 100% surface illumination
+let currentShadowDarkness = 65;  // 0% (soft) to 100% (pitch black)
+
+function updateAssetLighting() {
+  const theta = THREE.MathUtils.degToRad(currentSunAngle);
+  const phi = THREE.MathUtils.degToRad(currentSunHeight);
+  const R = 340;
+
+  const cosElev = Math.cos(phi);
+  sunLight.position.set(
+    R * cosElev * Math.sin(theta),
+    R * Math.sin(phi),
+    R * cosElev * Math.cos(theta)
+  );
+
+  // Asset direct illumination: 0 to 3.2 intensity
+  const brightFactor = currentAssetBrightness / 100;
+  sunLight.intensity = brightFactor * 3.2;
+
+  // Shadow darkness controls ambient & fill lighting levels
+  // 100% darkness = low ambient (crisp, deep pitch-black shadows)
+  // 0% darkness = high ambient (soft, light, translucent shadows)
+  const darknessFactor = currentShadowDarkness / 100;
+  const ambientLevel = THREE.MathUtils.lerp(1.35, 0.03, darknessFactor);
+  const hemiLevel = THREE.MathUtils.lerp(1.45, 0.04, darknessFactor);
+  const fillLevel = THREE.MathUtils.lerp(0.85, 0.01, darknessFactor);
+
+  ambientLight.intensity = ambientLevel;
+  hemiLight.intensity = hemiLevel;
+  fillLight.intensity = fillLevel;
+
+  // Sync Slider UI if elements exist
+  const saSlider = document.getElementById('sun-angle-slider');
+  const saVal = document.getElementById('sun-angle-val');
+  const shSlider = document.getElementById('sun-height-slider');
+  const shVal = document.getElementById('sun-height-val');
+  const abSlider = document.getElementById('asset-brightness-slider');
+  const abVal = document.getElementById('asset-brightness-val');
+  const sdSlider = document.getElementById('shadow-darkness-slider');
+  const sdVal = document.getElementById('shadow-darkness-val');
+
+  if (saSlider && Number(saSlider.value) !== currentSunAngle) saSlider.value = currentSunAngle;
+  if (saVal) saVal.textContent = `${currentSunAngle}°`;
+  if (shSlider && Number(shSlider.value) !== currentSunHeight) shSlider.value = currentSunHeight;
+  if (shVal) shVal.textContent = `${currentSunHeight}°`;
+  if (abSlider && Number(abSlider.value) !== currentAssetBrightness) abSlider.value = currentAssetBrightness;
+  if (abVal) abVal.textContent = `${currentAssetBrightness}%`;
+  if (sdSlider && Number(sdSlider.value) !== currentShadowDarkness) sdSlider.value = currentShadowDarkness;
+  if (sdVal) sdVal.textContent = `${currentShadowDarkness}%`;
+}
+
+function prepareMeshShadows(object3D) {
+  if (!object3D) return;
+  object3D.traverse((child) => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+}
+
+// Initial asset lighting setup
+updateAssetLighting();
 
 // 6. Multiple Grounds Setup
 const textureLoader = new THREE.TextureLoader();
@@ -410,25 +478,8 @@ function setBrightnessLevel(val) {
   // Exposure: Smooth dynamic range from deep night (0.35) to brilliant day (1.3)
   renderer.toneMappingExposure = 0.35 + t * 0.95;
 
-  // Sun & Moon Directional Light
-  sunLight.intensity = 0.2 + t * 2.0;
+  // Sun color tint from night moonlight (cool blue) to warm sunlight
   sunLight.color.lerpColors(new THREE.Color(0x93c5fd), new THREE.Color(0xfffbeb), t);
-
-  // Sunlight angle lowers smoothly towards horizon as dusk arrives
-  const angle = (t * 0.35 + 0.15) * Math.PI;
-  sunLight.position.set(Math.cos(angle) * 220, Math.sin(angle) * 240 + 20, 120);
-
-  // Hemisphere Light (Sky & Ground)
-  hemiLight.intensity = 0.15 + t * 1.05;
-  hemiLight.color.lerpColors(new THREE.Color(0x1e293b), new THREE.Color(0xffffff), t);
-  hemiLight.groundColor.lerpColors(new THREE.Color(0x0f172a), new THREE.Color(0x64748b), t);
-
-  // Ambient Light
-  ambientLight.intensity = 0.12 + t * 0.58;
-  ambientLight.color.lerpColors(new THREE.Color(0x1e1b4b), new THREE.Color(0xffffff), t);
-
-  // Fill Light
-  fillLight.intensity = 0.08 + t * 0.72;
 
   // Atmospheric Fog: Midnight navy to soft daylight blue
   if (scene.fog) {
@@ -454,6 +505,9 @@ function setBrightnessLevel(val) {
   if (scene.background && scene.background.isColor) {
     scene.background.lerpColors(new THREE.Color(0x030712), new THREE.Color(0x7dd3fc), t);
   }
+
+  // Update universal asset direct illumination & shadow darkness
+  updateAssetLighting();
 }
 
 if (brightnessSlider) {
@@ -650,6 +704,16 @@ const studioPanel = document.getElementById('studio-panel');
 const studioToggleBtn = document.getElementById('studio-toggle-btn');
 const studioHeader = document.getElementById('studio-header');
 
+// Asset Lighting & Shadows DOM Elements (Universal for all current & future assets)
+const sunAngleSlider = document.getElementById('sun-angle-slider');
+const sunAngleVal = document.getElementById('sun-angle-val');
+const sunHeightSlider = document.getElementById('sun-height-slider');
+const sunHeightVal = document.getElementById('sun-height-val');
+const assetBrightnessSlider = document.getElementById('asset-brightness-slider');
+const assetBrightnessVal = document.getElementById('asset-brightness-val');
+const shadowDarknessSlider = document.getElementById('shadow-darkness-slider');
+const shadowDarknessVal = document.getElementById('shadow-darkness-val');
+
 // Presets DOM Elements
 const presetSelect = document.getElementById('preset-select');
 const btnCopyPreset = document.getElementById('btn-copy-preset');
@@ -670,6 +734,12 @@ const defaultPresets = {
       position: { x: 3.5, y: 1.2, z: 147.5 },
       target: { x: 19.1, y: -1.6, z: 5 },
     },
+    lighting: {
+      sunAngle: 45,
+      sunHeight: 50,
+      assetBrightness: 70,
+      shadowDarkness: 65,
+    },
     objects: [
       { id: 'buildings_0', type: 'buildings', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 0 } },
       { id: 'mountains_0', type: 'mountains', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 0 } },
@@ -687,6 +757,12 @@ const defaultPresets = {
       position: { x: -160, y: 95, z: 140 },
       target: { x: 0, y: 15, z: 0 },
     },
+    lighting: {
+      sunAngle: 240,
+      sunHeight: 25,
+      assetBrightness: 85,
+      shadowDarkness: 75,
+    },
     objects: [
       { id: 'buildings_0', type: 'buildings', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 0 } },
       { id: 'mountains_0', type: 'mountains', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 0 } },
@@ -703,6 +779,12 @@ const defaultPresets = {
     camera: {
       position: { x: 90, y: 40, z: 110 },
       target: { x: 0, y: 20, z: 0 },
+    },
+    lighting: {
+      sunAngle: 110,
+      sunHeight: 18,
+      assetBrightness: 40,
+      shadowDarkness: 90,
     },
     objects: [
       { id: 'buildings_0', type: 'buildings', isClone: false, offset: { x: 0, y: 0, z: 0, rotY: 25 } },
@@ -864,6 +946,39 @@ if (rotYSlider) {
   });
 }
 
+// Universal Asset Lighting & Shadows Slider Listeners
+if (sunAngleSlider) {
+  sunAngleSlider.addEventListener('input', (e) => {
+    currentSunAngle = Number(e.target.value);
+    if (sunAngleVal) sunAngleVal.textContent = `${currentSunAngle}°`;
+    updateAssetLighting();
+  });
+}
+
+if (sunHeightSlider) {
+  sunHeightSlider.addEventListener('input', (e) => {
+    currentSunHeight = Number(e.target.value);
+    if (sunHeightVal) sunHeightVal.textContent = `${currentSunHeight}°`;
+    updateAssetLighting();
+  });
+}
+
+if (assetBrightnessSlider) {
+  assetBrightnessSlider.addEventListener('input', (e) => {
+    currentAssetBrightness = Number(e.target.value);
+    if (assetBrightnessVal) assetBrightnessVal.textContent = `${currentAssetBrightness}%`;
+    updateAssetLighting();
+  });
+}
+
+if (shadowDarknessSlider) {
+  shadowDarknessSlider.addEventListener('input', (e) => {
+    currentShadowDarkness = Number(e.target.value);
+    if (shadowDarknessVal) shadowDarknessVal.textContent = `${currentShadowDarkness}%`;
+    updateAssetLighting();
+  });
+}
+
 // =====================================================================
 // --- Universal Undo / Redo History Stack ---
 // =====================================================================
@@ -896,6 +1011,10 @@ function captureSnapshot() {
     brightness: brightnessSlider ? Number(brightnessSlider.value) : 57,
     skySpeed: skySpeedSlider ? Number(skySpeedSlider.value) : 35,
     skyDirection: currentSkyDirection,
+    sunAngle: currentSunAngle,
+    sunHeight: currentSunHeight,
+    assetBrightness: currentAssetBrightness,
+    shadowDarkness: currentShadowDarkness,
   };
 }
 
@@ -955,6 +1074,7 @@ function restoreSnapshot(snap) {
       basePos.z + objData.offset.z
     );
     grp.rotation.y = (objData.offset.rotY * Math.PI) / 180;
+    prepareMeshShadows(grp);
 
     newRegistry.push({
       id: objData.id,
@@ -1005,6 +1125,13 @@ function restoreSnapshot(snap) {
       else b.classList.remove('active');
     });
   }
+
+  // 7. Universal Asset Lighting & Shadows
+  if (snap.sunAngle !== undefined) currentSunAngle = snap.sunAngle;
+  if (snap.sunHeight !== undefined) currentSunHeight = snap.sunHeight;
+  if (snap.assetBrightness !== undefined) currentAssetBrightness = snap.assetBrightness;
+  if (snap.shadowDarkness !== undefined) currentShadowDarkness = snap.shadowDarkness;
+  updateAssetLighting();
 }
 
 function undo() {
@@ -1082,6 +1209,10 @@ attachSliderHistory(posZSlider);
 attachSliderHistory(rotYSlider);
 attachSliderHistory(brightnessSlider);
 attachSliderHistory(skySpeedSlider);
+attachSliderHistory(sunAngleSlider);
+attachSliderHistory(sunHeightSlider);
+attachSliderHistory(assetBrightnessSlider);
+attachSliderHistory(shadowDarknessSlider);
 
 // Add Building / Mountain logic (Supports adding even if main was deleted)
 let buildingAddCount = 0;
@@ -1122,6 +1253,8 @@ function addNewObject(type) {
     isClone = true;
     newId = `${type}_added_${Date.now()}_${Math.random()}`;
   }
+
+  prepareMeshShadows(newGroup);
 
   const objName = isClone ? `${typeLabel} (Clone #${count})` : `${typeLabel} (Main)`;
 
@@ -1182,6 +1315,7 @@ if (duplicateBtn) {
     cloneGroup.rotation.copy(srcObj.group.rotation);
 
     scene.add(cloneGroup);
+    prepareMeshShadows(cloneGroup);
 
     const newId = `${srcObj.type}_clone_${Date.now()}`;
     const typeLabel = srcObj.type === 'buildings' ? '🏙️ Buildings' : '⛰️ Mountains';
@@ -1395,6 +1529,7 @@ function applyPreset(key) {
         );
         cloneGroup.rotation.y = ((objData.offset?.rotY ?? 0) * Math.PI) / 180;
         scene.add(cloneGroup);
+        prepareMeshShadows(cloneGroup);
 
         objectsRegistry.push({
           id: objData.id || `${objData.type}_clone_${Date.now()}_${Math.random()}`,
@@ -1420,6 +1555,15 @@ function applyPreset(key) {
       controls.target.set(p.camera.target.x, p.camera.target.y, p.camera.target.z);
     }
     controls.update();
+  }
+
+  // 8. Universal Asset Lighting & Shadows
+  if (p.lighting) {
+    if (p.lighting.sunAngle !== undefined) currentSunAngle = p.lighting.sunAngle;
+    if (p.lighting.sunHeight !== undefined) currentSunHeight = p.lighting.sunHeight;
+    if (p.lighting.assetBrightness !== undefined) currentAssetBrightness = p.lighting.assetBrightness;
+    if (p.lighting.shadowDarkness !== undefined) currentShadowDarkness = p.lighting.shadowDarkness;
+    updateAssetLighting();
   }
 
   if (presetStatus) {
@@ -1454,6 +1598,12 @@ function getCurrentSceneConfig() {
     skyDirection: currentSkyDirection,
     groundType: currentGroundType,
     mountainStyle: mountainStyleSelect?.value ?? 'natural',
+    lighting: {
+      sunAngle: currentSunAngle,
+      sunHeight: currentSunHeight,
+      assetBrightness: currentAssetBrightness,
+      shadowDarkness: currentShadowDarkness,
+    },
     camera: {
       position: {
         x: Number(camera.position.x.toFixed(1)),

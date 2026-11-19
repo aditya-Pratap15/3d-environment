@@ -7,6 +7,12 @@
     "skyDirection": "E_W",
     "groundType": "grass",
     "mountainStyle": "natural",
+    "lighting": {
+      "sunAngle": 45,
+      "sunHeight": 50,
+      "assetBrightness": 70,
+      "shadowDarkness": 65
+    },
     "camera": {
       "position": { "x": 3.5, "y": 1.2, "z": 147.5 },
       "target": { "x": 19.1, "y": -1.6, "z": 5 }
@@ -48,6 +54,12 @@
     "skyDirection": "NW_SE",
     "groundType": "autumn",
     "mountainStyle": "canyon",
+    "lighting": {
+      "sunAngle": 240,
+      "sunHeight": 25,
+      "assetBrightness": 85,
+      "shadowDarkness": 75
+    },
     "camera": {
       "position": { "x": -160, "y": 95, "z": 140 },
       "target": { "x": 0, "y": 15, "z": 0 }
@@ -85,6 +97,12 @@
     "skyDirection": "NE_SW",
     "groundType": "hexgrid",
     "mountainStyle": "lava",
+    "lighting": {
+      "sunAngle": 110,
+      "sunHeight": 18,
+      "assetBrightness": 40,
+      "shadowDarkness": 90
+    },
     "camera": {
       "position": { "x": 90, "y": 40, "z": 110 },
       "target": { "x": 0, "y": 20, "z": 0 }
