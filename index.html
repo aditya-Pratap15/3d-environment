@@ -167,21 +167,18 @@
           </div>
         </div>
 
-        <!-- Flight Settings: Duration & Curve -->
+        <!-- Flight Settings: Camera Speed Slider & View Toggle -->
         <div class="director-section">
           <div class="slider-row" style="margin-bottom: 6px;">
-            <span class="director-sublabel">⏱️ Duration:</span>
-            <input type="range" id="flight-duration-slider" class="styled-slider director-slider" min="3" max="60" value="10" />
-            <span class="val-display" id="flight-duration-val">10s</span>
+            <span class="director-sublabel">🚀 Camera Speed:</span>
+            <input type="range" id="camera-speed-slider" class="styled-slider director-slider" min="1" max="100" value="35" />
+            <span class="val-display" id="camera-speed-val">35%</span>
           </div>
           <div class="director-options-row">
-            <label class="director-checkbox-label">
-              <input type="checkbox" id="path-loop-checkbox" />
-              <span>🔁 Loop</span>
-            </label>
+            <span style="font-size: 10px; color: #94a3b8;">🔁 Infinite Loop Flight</span>
             <label class="director-checkbox-label">
               <input type="checkbox" id="show-path-line-checkbox" checked />
-              <span>👁️ 3D Path Line</span>
+              <span>👁️ 3D Path</span>
             </label>
           </div>
         </div>

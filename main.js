@@ -564,11 +564,37 @@ if (btnResetSky) {
   });
 }
 
-// 12. Animation Loop with Dynamic Sky & Reflection Movement
+// 12. Animation Loop with Dynamic Sky, Reflection Movement & Infinite Camera Flight
 let frameCount = 0;
+let isFlyingCamera = false;
+let activePosCurve = null;
+let activeTargetCurve = null;
+let flightProgress = 0;
+const tempFlightPos = new THREE.Vector3();
+const tempFlightTarget = new THREE.Vector3();
+let cameraSpeedPercent = 35;
+const flightClock = new THREE.Clock();
+
 function animate() {
   requestAnimationFrame(animate);
-  controls.update();
+
+  const delta = flightClock.getDelta();
+
+  // Infinite Camera Flight Path loop
+  if (isFlyingCamera && activePosCurve && activeTargetCurve) {
+    controls.enabled = false;
+    const rate = Math.max(0.005, (cameraSpeedPercent / 100) * 0.12);
+    flightProgress = (flightProgress + delta * rate) % 1.0;
+
+    activePosCurve.getPointAt(flightProgress, tempFlightPos);
+    activeTargetCurve.getPointAt(flightProgress, tempFlightTarget);
+
+    camera.position.copy(tempFlightPos);
+    controls.target.copy(tempFlightTarget);
+  } else {
+    controls.enabled = true;
+    controls.update();
+  }
 
   // Position SkyDome centered on camera (infinite distance effect) & rotate
   if (skyDome) {
@@ -1244,9 +1270,8 @@ const btnClearKeyframes = document.getElementById('btn-clear-keyframes');
 const keyframeCount = document.getElementById('keyframe-count');
 const waypointsTimeline = document.getElementById('waypoints-timeline');
 
-const flightDurationSlider = document.getElementById('flight-duration-slider');
-const flightDurationVal = document.getElementById('flight-duration-val');
-const pathLoopCheckbox = document.getElementById('path-loop-checkbox');
+const cameraSpeedSlider = document.getElementById('camera-speed-slider');
+const cameraSpeedVal = document.getElementById('camera-speed-val');
 const showPathLineCheckbox = document.getElementById('show-path-line-checkbox');
 
 const btnPreviewFlight = document.getElementById('btn-preview-flight');
@@ -1257,6 +1282,20 @@ const directorStatus = document.getElementById('director-status');
 let cameraWaypoints = [];
 const pathVisualGroup = new THREE.Group();
 scene.add(pathVisualGroup);
+
+function rebuildSplineCurves() {
+  if (cameraWaypoints.length < 2) {
+    activePosCurve = null;
+    activeTargetCurve = null;
+    return;
+  }
+  const posPoints = cameraWaypoints.map((w) => w.position);
+  const targetPoints = cameraWaypoints.map((w) => w.target);
+
+  // Closed loop: smoothly continuous from last point back into first point
+  activePosCurve = new THREE.CatmullRomCurve3(posPoints, true, 'catmullrom', 0.5);
+  activeTargetCurve = new THREE.CatmullRomCurve3(targetPoints, true, 'catmullrom', 0.5);
+}
 
 function updateWaypointsUI() {
   if (keyframeCount) {
@@ -1275,7 +1314,7 @@ function updateWaypointsUI() {
         chip.title = `Click to view Point #${idx + 1}`;
         chip.innerHTML = `<span>P${idx + 1}</span><span class="remove-pt-btn" title="Remove this point">✕</span>`;
 
-        // Click chip to view angle
+        // Click chip to snap camera and view angle
         chip.addEventListener('click', (e) => {
           if (e.target.classList.contains('remove-pt-btn')) return;
           jumpToWaypoint(w.id);
@@ -1295,6 +1334,7 @@ function updateWaypointsUI() {
     }
   }
 
+  rebuildSplineCurves();
   updatePathVisual();
 }
 
@@ -1310,9 +1350,8 @@ function updatePathVisual() {
   const showLine = showPathLineCheckbox ? showPathLineCheckbox.checked : true;
   if (!showLine || cameraWaypoints.length < 2) return;
 
-  const isLoop = pathLoopCheckbox ? pathLoopCheckbox.checked : false;
   const points = cameraWaypoints.map((w) => w.position);
-  const curve = new THREE.CatmullRomCurve3(points, isLoop, 'catmullrom', 0.5);
+  const curve = new THREE.CatmullRomCurve3(points, true, 'catmullrom', 0.5);
   const curvePoints = curve.getPoints(120);
 
   const lineGeom = new THREE.BufferGeometry().setFromPoints(curvePoints);
@@ -1354,7 +1393,7 @@ function addCurrentWaypoint() {
 }
 
 function clearAllWaypoints() {
-  stopFlight();
+  stopFlightLoop();
   cameraWaypoints = [];
   updateWaypointsUI();
 
@@ -1368,7 +1407,7 @@ function clearAllWaypoints() {
 }
 
 function removeWaypoint(id) {
-  stopFlight();
+  stopFlightLoop();
   cameraWaypoints = cameraWaypoints.filter((w) => w.id !== id);
   updateWaypointsUI();
 }
@@ -1381,16 +1420,11 @@ function jumpToWaypoint(id) {
   controls.update();
 }
 
-// Duration slider display
-if (flightDurationSlider) {
-  flightDurationSlider.addEventListener('input', (e) => {
-    if (flightDurationVal) flightDurationVal.textContent = `${e.target.value}s`;
-  });
-}
-
-if (pathLoopCheckbox) {
-  pathLoopCheckbox.addEventListener('change', () => {
-    updatePathVisual();
+// Camera Speed Slider
+if (cameraSpeedSlider) {
+  cameraSpeedSlider.addEventListener('input', (e) => {
+    cameraSpeedPercent = Number(e.target.value);
+    if (cameraSpeedVal) cameraSpeedVal.textContent = `${cameraSpeedPercent}%`;
   });
 }
 
@@ -1408,95 +1442,36 @@ if (btnClearKeyframes) {
   btnClearKeyframes.addEventListener('click', clearAllWaypoints);
 }
 
-// --- Flight Interpolation Engine ---
-let isFlying = false;
-let flightReqId = null;
-
-function stopFlight() {
-  if (flightReqId) {
-    cancelAnimationFrame(flightReqId);
-    flightReqId = null;
-  }
-  isFlying = false;
-  controls.enabled = true;
-  if (btnPreviewFlight) btnPreviewFlight.textContent = '▶️ Preview';
-}
-
-function startFlight({ onComplete, onTick } = {}) {
+// --- Flight Loop Controls (Continuous Seamless Flying) ---
+function startFlightLoop() {
   if (cameraWaypoints.length < 2) {
     alert('Please add at least 2 camera points to create a flight path!');
     return false;
   }
-
-  stopFlight();
-  isFlying = true;
-  controls.enabled = false;
-  if (btnPreviewFlight) btnPreviewFlight.textContent = '⏹️ Stop';
-
-  const isLoop = pathLoopCheckbox ? pathLoopCheckbox.checked : false;
-  const posCurve = new THREE.CatmullRomCurve3(
-    cameraWaypoints.map((w) => w.position),
-    isLoop,
-    'catmullrom',
-    0.5
-  );
-  const targetCurve = new THREE.CatmullRomCurve3(
-    cameraWaypoints.map((w) => w.target),
-    isLoop,
-    'catmullrom',
-    0.5
-  );
-
-  const durationSec = Number(flightDurationSlider?.value ?? 10);
-  const durationMs = durationSec * 1000;
-  const startTime = performance.now();
-
-  const tempPos = new THREE.Vector3();
-  const tempTarget = new THREE.Vector3();
-
-  function flightStep(now) {
-    if (!isFlying) return;
-    const elapsed = now - startTime;
-    let t = elapsed / durationMs;
-
-    if (t >= 1) {
-      t = 1;
-      posCurve.getPointAt(1, tempPos);
-      targetCurve.getPointAt(1, tempTarget);
-      camera.position.copy(tempPos);
-      controls.target.copy(tempTarget);
-      controls.update();
-
-      stopFlight();
-      if (onComplete) onComplete();
-      return;
-    }
-
-    posCurve.getPointAt(t, tempPos);
-    targetCurve.getPointAt(t, tempTarget);
-    camera.position.copy(tempPos);
-    controls.target.copy(tempTarget);
-    controls.update();
-
-    if (onTick) onTick(t);
-    flightReqId = requestAnimationFrame(flightStep);
-  }
-
-  flightReqId = requestAnimationFrame(flightStep);
+  rebuildSplineCurves();
+  flightProgress = 0;
+  isFlyingCamera = true;
+  if (btnPreviewFlight) btnPreviewFlight.textContent = '⏹️ Stop Preview';
   return true;
+}
+
+function stopFlightLoop() {
+  isFlyingCamera = false;
+  controls.enabled = true;
+  if (btnPreviewFlight) btnPreviewFlight.textContent = '▶️ Preview';
 }
 
 if (btnPreviewFlight) {
   btnPreviewFlight.addEventListener('click', () => {
-    if (isFlying) {
-      stopFlight();
+    if (isFlyingCamera && !isRecording) {
+      stopFlightLoop();
     } else {
-      startFlight();
+      startFlightLoop();
     }
   });
 }
 
-// --- MP4 Video Recorder Engine ---
+// --- MP4 Video Recorder Engine (Continuous Recording Until User Stops) ---
 let isRecording = false;
 let mediaRecorder = null;
 let recordedChunks = [];
@@ -1520,7 +1495,7 @@ function getBestMimeType() {
   return '';
 }
 
-function startRecording(autoStopOnFlightEnd = false) {
+function startRecording() {
   if (isRecording) return;
 
   const mimeType = getBestMimeType();
@@ -1529,7 +1504,15 @@ function startRecording(autoStopOnFlightEnd = false) {
     return;
   }
 
-  // Hide 3D path line during recording for pristine video
+  // If we have at least 2 waypoints, start continuous camera loop flight immediately!
+  if (cameraWaypoints.length >= 2) {
+    rebuildSplineCurves();
+    flightProgress = 0;
+    isFlyingCamera = true;
+    if (btnPreviewFlight) btnPreviewFlight.textContent = '⏹️ Stop Preview';
+  }
+
+  // Hide 3D path line during recording for cinema-quality output
   pathVisualGroup.visible = false;
   recordedChunks = [];
 
@@ -1556,6 +1539,7 @@ function startRecording(autoStopOnFlightEnd = false) {
   mediaRecorder.onstop = () => {
     clearInterval(recordingTimer);
     isRecording = false;
+
     if (btnRecordVideo) {
       btnRecordVideo.textContent = '🔴 Record MP4';
       btnRecordVideo.classList.remove('recording');
@@ -1597,7 +1581,7 @@ function startRecording(autoStopOnFlightEnd = false) {
 
   if (directorStatus) {
     directorStatus.className = 'director-status recording-active';
-    directorStatus.textContent = 'REC 00:00';
+    directorStatus.textContent = 'REC 00:00 (Looping)';
   }
 
   recordingTimer = setInterval(() => {
@@ -1608,23 +1592,11 @@ function startRecording(autoStopOnFlightEnd = false) {
       directorStatus.textContent = `REC ${mm}:${ss} (60fps)`;
     }
   }, 500);
-
-  // If path has 2+ waypoints, fly automatically and auto-save at the end
-  if (autoStopOnFlightEnd && cameraWaypoints.length >= 2) {
-    startFlight({
-      onComplete: () => {
-        // Small buffer to capture the final resting frame
-        setTimeout(() => {
-          stopRecording();
-        }, 500);
-      },
-    });
-  }
 }
 
 function stopRecording() {
   if (!isRecording) return;
-  stopFlight();
+  stopFlightLoop();
   if (mediaRecorder && mediaRecorder.state !== 'inactive') {
     mediaRecorder.stop();
   }
@@ -1635,10 +1607,7 @@ if (btnRecordVideo) {
     if (isRecording) {
       stopRecording();
     } else {
-      // If we have waypoints, automatically fly along the curve and save when finished!
-      // If no waypoints, let the user record manually with free orbit.
-      const hasWaypoints = cameraWaypoints.length >= 2;
-      startRecording(hasWaypoints);
+      startRecording();
     }
   });
 }
