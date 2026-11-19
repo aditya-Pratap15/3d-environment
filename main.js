@@ -355,6 +355,8 @@ gltfLoader.load(
     scene.add(mountainGroup);
     scene.add(buildingsGroup);
 
+    initObjectsRegistry();
+
     modelLoaded = true;
     if (loaderProgress) loaderProgress.style.width = '100%';
     checkLoadingDone();
@@ -579,19 +581,11 @@ function animate() {
 
 animate();
 
-// 13. Top Left Studio Controls: Independent Transform, Duplicate & Mountain Styles
-let currentTarget = 'buildings'; // 'buildings' | 'mountains'
-const targetTransforms = {
-  buildings: { x: 0, y: 0, z: 0, rotY: 0 },
-  mountains: { x: 0, y: 0, z: 0, rotY: 0 },
-};
+// 13. Top Left Studio Controls: Multi-Object Instance Transform, Duplicate & Mountain Styles
+let objectsRegistry = [];
+let selectedObjectId = 'buildings_0';
 
-function getTargetGroup() {
-  return currentTarget === 'buildings' ? buildingsGroup : mountainGroup;
-}
-
-const targetBuildingsBtn = document.getElementById('target-buildings-btn');
-const targetMountainsBtn = document.getElementById('target-mountains-btn');
+const activeObjectSelect = document.getElementById('active-object-select');
 const posXSlider = document.getElementById('pos-x-slider');
 const posYSlider = document.getElementById('pos-y-slider');
 const posZSlider = document.getElementById('pos-z-slider');
@@ -602,107 +596,217 @@ const posZVal = document.getElementById('pos-z-val');
 const rotYVal = document.getElementById('rot-y-val');
 const duplicateBtn = document.getElementById('btn-duplicate-target');
 const resetBtn = document.getElementById('btn-reset-target');
+const deleteCloneBtn = document.getElementById('btn-delete-clone');
 const duplicateStatus = document.getElementById('duplicate-status');
 const mountainStyleSelect = document.getElementById('mountain-style-select');
 const studioPanel = document.getElementById('studio-panel');
 const studioToggleBtn = document.getElementById('studio-toggle-btn');
 const studioHeader = document.getElementById('studio-header');
 
-function updateSliderUI() {
-  const t = targetTransforms[currentTarget];
-  if (posXSlider) posXSlider.value = t.x;
-  if (posYSlider) posYSlider.value = t.y;
-  if (posZSlider) posZSlider.value = t.z;
-  if (rotYSlider) rotYSlider.value = t.rotY;
+function initObjectsRegistry() {
+  objectsRegistry = [
+    {
+      id: 'buildings_0',
+      type: 'buildings',
+      name: '🏙️ Buildings (Main)',
+      isClone: false,
+      group: buildingsGroup,
+      basePos: baseModelPos.clone(),
+      offset: { x: 0, y: 0, z: 0, rotY: 0 },
+    },
+    {
+      id: 'mountains_0',
+      type: 'mountains',
+      name: '⛰️ Mountains (Main)',
+      isClone: false,
+      group: mountainGroup,
+      basePos: baseModelPos.clone(),
+      offset: { x: 0, y: 0, z: 0, rotY: 0 },
+    },
+  ];
+  selectedObjectId = 'buildings_0';
+  updateObjectSelectOptions();
+  updateSliderUI();
+}
 
-  if (posXVal) posXVal.textContent = `${t.x}m`;
-  if (posYVal) posYVal.textContent = `${t.y}m`;
-  if (posZVal) posZVal.textContent = `${t.z}m`;
-  if (rotYVal) rotYVal.textContent = `${t.rotY}°`;
+function getSelectedObject() {
+  return objectsRegistry.find((o) => o.id === selectedObjectId) || objectsRegistry[0];
+}
+
+function updateObjectSelectOptions() {
+  if (!activeObjectSelect) return;
+  activeObjectSelect.innerHTML = '';
+
+  objectsRegistry.forEach((obj) => {
+    const opt = document.createElement('option');
+    opt.value = obj.id;
+    opt.textContent = obj.name;
+    if (obj.id === selectedObjectId) opt.selected = true;
+    activeObjectSelect.appendChild(opt);
+  });
+
+  const cur = getSelectedObject();
+  if (deleteCloneBtn) {
+    deleteCloneBtn.style.display = cur && cur.isClone ? 'block' : 'none';
+  }
+}
+
+function updateSliderUI() {
+  const obj = getSelectedObject();
+  if (!obj) return;
+
+  const off = obj.offset;
+  if (posXSlider) posXSlider.value = off.x;
+  if (posYSlider) posYSlider.value = off.y;
+  if (posZSlider) posZSlider.value = off.z;
+  if (rotYSlider) rotYSlider.value = off.rotY;
+
+  if (posXVal) posXVal.textContent = `${off.x}m`;
+  if (posYVal) posYVal.textContent = `${off.y}m`;
+  if (posZVal) posZVal.textContent = `${off.z}m`;
+  if (rotYVal) rotYVal.textContent = `${off.rotY}°`;
 }
 
 function applyTransform() {
-  const group = getTargetGroup();
-  const t = targetTransforms[currentTarget];
+  const obj = getSelectedObject();
+  if (!obj || !obj.group) return;
 
-  group.position.set(
-    baseModelPos.x + t.x,
-    baseModelPos.y + t.y,
-    baseModelPos.z + t.z
+  obj.group.position.set(
+    obj.basePos.x + obj.offset.x,
+    obj.basePos.y + obj.offset.y,
+    obj.basePos.z + obj.offset.z
   );
-  group.rotation.y = (t.rotY * Math.PI) / 180;
+  obj.group.rotation.y = (obj.offset.rotY * Math.PI) / 180;
 }
 
-if (targetBuildingsBtn && targetMountainsBtn) {
-  targetBuildingsBtn.addEventListener('click', () => {
-    currentTarget = 'buildings';
-    targetBuildingsBtn.classList.add('active');
-    targetMountainsBtn.classList.remove('active');
-    updateSliderUI();
-  });
-
-  targetMountainsBtn.addEventListener('click', () => {
-    currentTarget = 'mountains';
-    targetMountainsBtn.classList.add('active');
-    targetBuildingsBtn.classList.remove('active');
+if (activeObjectSelect) {
+  activeObjectSelect.addEventListener('change', (e) => {
+    selectedObjectId = e.target.value;
+    const cur = getSelectedObject();
+    if (deleteCloneBtn) {
+      deleteCloneBtn.style.display = cur && cur.isClone ? 'block' : 'none';
+    }
     updateSliderUI();
   });
 }
 
 if (posXSlider) {
   posXSlider.addEventListener('input', (e) => {
-    targetTransforms[currentTarget].x = Number(e.target.value);
-    if (posXVal) posXVal.textContent = `${e.target.value}m`;
-    applyTransform();
+    const obj = getSelectedObject();
+    if (obj) {
+      obj.offset.x = Number(e.target.value);
+      if (posXVal) posXVal.textContent = `${e.target.value}m`;
+      applyTransform();
+    }
   });
 }
 
 if (posYSlider) {
   posYSlider.addEventListener('input', (e) => {
-    targetTransforms[currentTarget].y = Number(e.target.value);
-    if (posYVal) posYVal.textContent = `${e.target.value}m`;
-    applyTransform();
+    const obj = getSelectedObject();
+    if (obj) {
+      obj.offset.y = Number(e.target.value);
+      if (posYVal) posYVal.textContent = `${e.target.value}m`;
+      applyTransform();
+    }
   });
 }
 
 if (posZSlider) {
   posZSlider.addEventListener('input', (e) => {
-    targetTransforms[currentTarget].z = Number(e.target.value);
-    if (posZVal) posZVal.textContent = `${e.target.value}m`;
-    applyTransform();
+    const obj = getSelectedObject();
+    if (obj) {
+      obj.offset.z = Number(e.target.value);
+      if (posZVal) posZVal.textContent = `${e.target.value}m`;
+      applyTransform();
+    }
   });
 }
 
 if (rotYSlider) {
   rotYSlider.addEventListener('input', (e) => {
-    targetTransforms[currentTarget].rotY = Number(e.target.value);
-    if (rotYVal) rotYVal.textContent = `${e.target.value}°`;
-    applyTransform();
+    const obj = getSelectedObject();
+    if (obj) {
+      obj.offset.rotY = Number(e.target.value);
+      if (rotYVal) rotYVal.textContent = `${e.target.value}°`;
+      applyTransform();
+    }
   });
 }
 
-// Duplicate Object logic
-const duplicateCounts = { buildings: 0, mountains: 0 };
+// Duplicate Object logic (Instantly selectable and movable)
+const cloneCounters = { buildings: 0, mountains: 0 };
 if (duplicateBtn) {
   duplicateBtn.addEventListener('click', () => {
-    const group = getTargetGroup();
-    duplicateCounts[currentTarget]++;
-    const count = duplicateCounts[currentTarget];
+    const srcObj = getSelectedObject();
+    if (!srcObj || !srcObj.group) return;
 
-    const clone = group.clone(true);
-    // Offset clone by distance so it appears alongside
-    const offsetDistance = count * 90;
-    clone.position.x = group.position.x + offsetDistance;
-    clone.position.z = group.position.z + (count % 2 === 0 ? 30 : -30);
+    cloneCounters[srcObj.type]++;
+    const count = cloneCounters[srcObj.type];
 
-    scene.add(clone);
+    const cloneGroup = srcObj.group.clone(true);
+    // Offset clone in world space so it sits visibly distinct
+    const newBasePos = srcObj.group.position.clone();
+    newBasePos.x += 80;
+    newBasePos.z += (count % 2 === 0 ? 30 : -30);
+    cloneGroup.position.copy(newBasePos);
+    cloneGroup.rotation.copy(srcObj.group.rotation);
+
+    scene.add(cloneGroup);
+
+    const newId = `${srcObj.type}_clone_${Date.now()}`;
+    const typeLabel = srcObj.type === 'buildings' ? '🏙️ Buildings' : '⛰️ Mountains';
+    const cloneName = `${typeLabel} (Clone #${count})`;
+
+    const newEntry = {
+      id: newId,
+      type: srcObj.type,
+      name: cloneName,
+      isClone: true,
+      group: cloneGroup,
+      basePos: newBasePos.clone(),
+      offset: { x: 0, y: 0, z: 0, rotY: 0 },
+    };
+
+    objectsRegistry.push(newEntry);
+    selectedObjectId = newId;
+
+    updateObjectSelectOptions();
+    updateSliderUI();
 
     if (duplicateStatus) {
-      const name = currentTarget === 'buildings' ? 'Buildings' : 'Mountains';
-      duplicateStatus.textContent = `✓ ${name} duplicated (Clone #${count})`;
+      duplicateStatus.textContent = `✓ ${cloneName} created & active! Use sliders to move.`;
       setTimeout(() => {
         if (duplicateStatus) duplicateStatus.textContent = '';
-      }, 4000);
+      }, 4500);
+    }
+  });
+}
+
+// Delete Clone logic
+if (deleteCloneBtn) {
+  deleteCloneBtn.addEventListener('click', () => {
+    const idx = objectsRegistry.findIndex((o) => o.id === selectedObjectId);
+    if (idx === -1) return;
+
+    const obj = objectsRegistry[idx];
+    if (!obj.isClone) return;
+
+    scene.remove(obj.group);
+    objectsRegistry.splice(idx, 1);
+
+    // Fall back to main original object of same type
+    const fallback = objectsRegistry.find((o) => o.type === obj.type) || objectsRegistry[0];
+    selectedObjectId = fallback.id;
+
+    updateObjectSelectOptions();
+    updateSliderUI();
+
+    if (duplicateStatus) {
+      duplicateStatus.textContent = `🗑️ ${obj.name} removed`;
+      setTimeout(() => {
+        if (duplicateStatus) duplicateStatus.textContent = '';
+      }, 3000);
     }
   });
 }
@@ -710,9 +814,12 @@ if (duplicateBtn) {
 // Reset Object Transform logic
 if (resetBtn) {
   resetBtn.addEventListener('click', () => {
-    targetTransforms[currentTarget] = { x: 0, y: 0, z: 0, rotY: 0 };
-    applyTransform();
-    updateSliderUI();
+    const obj = getSelectedObject();
+    if (obj) {
+      obj.offset = { x: 0, y: 0, z: 0, rotY: 0 };
+      applyTransform();
+      updateSliderUI();
+    }
   });
 }
 
@@ -748,7 +855,7 @@ if (mountainStyleSelect) {
   });
 }
 
-// Studio Panel Collapse Toggle
+// Top Left Studio Panel Collapse Toggle
 if (studioToggleBtn && studioPanel) {
   const togglePanel = () => {
     studioPanel.classList.toggle('collapsed');
@@ -764,6 +871,31 @@ if (studioToggleBtn && studioPanel) {
     studioHeader.addEventListener('click', () => {
       if (studioPanel.classList.contains('collapsed')) {
         togglePanel();
+      }
+    });
+  }
+}
+
+// Top Right Atmosphere & Sky Controls Card Collapse Toggle
+const topControlsCard = document.getElementById('top-controls-card');
+const topControlsToggleBtn = document.getElementById('top-controls-toggle-btn');
+const topControlsHeader = document.getElementById('top-controls-header');
+
+if (topControlsToggleBtn && topControlsCard) {
+  const toggleTopCard = () => {
+    topControlsCard.classList.toggle('collapsed');
+    topControlsToggleBtn.textContent = topControlsCard.classList.contains('collapsed') ? '☀️' : '−';
+  };
+
+  topControlsToggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleTopCard();
+  });
+
+  if (topControlsHeader) {
+    topControlsHeader.addEventListener('click', () => {
+      if (topControlsCard.classList.contains('collapsed')) {
+        toggleTopCard();
       }
     });
   }

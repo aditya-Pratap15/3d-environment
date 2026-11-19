@@ -133,18 +133,76 @@ html, body {
   top: 18px;
   right: 18px;
   z-index: 30;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px 14px;
-  background: rgba(15, 23, 42, 0.72);
+  width: 220px;
+  background: rgba(15, 23, 42, 0.76);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 18px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.5), 0 0 20px rgba(56, 189, 248, 0.08);
-  width: 220px;
   box-sizing: border-box;
+  overflow: hidden;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.25s ease;
+}
+
+.top-controls-card.collapsed {
+  width: auto;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.85);
+}
+
+.top-controls-card.collapsed .top-controls-body {
+  display: none;
+}
+
+.top-controls-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.top-controls-card.collapsed .top-controls-header {
+  border-bottom: none;
+  padding: 8px 14px;
+}
+
+.top-controls-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: -0.01em;
+}
+
+.top-controls-toggle-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.top-controls-toggle-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.top-controls-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .control-row {
@@ -543,6 +601,20 @@ html, body {
 .studio-btn.secondary:hover {
   background: rgba(51, 65, 85, 0.85);
   color: #ffffff;
+}
+
+.studio-btn.danger {
+  width: 100%;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+
+.studio-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.35);
+  border-color: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
 }
 
 .duplicate-status {

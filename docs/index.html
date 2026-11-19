@@ -15,8 +15,8 @@
       }
     }
     </script>
-    <script type="module" crossorigin src="./assets/index-qs5EvvCB.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BfibA_y8.css">
+    <script type="module" crossorigin src="./assets/index-iUkkQUsc.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-B4EBNSak.css">
   </head>
   <body>
     <!-- Fullscreen 3D Canvas -->
@@ -55,13 +55,13 @@
       </div>
 
       <div class="studio-body" id="studio-body">
-        <!-- Target Selector (Buildings vs Mountains) -->
+        <!-- Target Object Selector (Supports Main & All Clones) -->
         <div class="studio-section">
-          <label class="section-label">Target Object</label>
-          <div class="target-toggle">
-            <button class="target-btn active" id="target-buildings-btn" data-target="buildings">🏙️ Buildings</button>
-            <button class="target-btn" id="target-mountains-btn" data-target="mountains">⛰️ Mountains</button>
-          </div>
+          <label class="section-label">Active Target Object</label>
+          <select id="active-object-select" class="studio-select" aria-label="Select Active Object to Move or Rotate">
+            <option value="buildings_0">🏙️ Buildings (Main)</option>
+            <option value="mountains_0">⛰️ Mountains (Main)</option>
+          </select>
         </div>
 
         <!-- Position Controls (X, Y Elevation, Z) -->
@@ -69,17 +69,17 @@
           <label class="section-label">Position / Elevation</label>
           <div class="slider-row">
             <span class="axis-badge">X</span>
-            <input type="range" id="pos-x-slider" class="styled-slider studio-slider" min="-120" max="120" value="0" />
+            <input type="range" id="pos-x-slider" class="styled-slider studio-slider" min="-250" max="250" value="0" />
             <span class="val-display" id="pos-x-val">0m</span>
           </div>
           <div class="slider-row">
             <span class="axis-badge">Y</span>
-            <input type="range" id="pos-y-slider" class="styled-slider studio-slider" min="-20" max="60" value="0" />
+            <input type="range" id="pos-y-slider" class="styled-slider studio-slider" min="-30" max="80" value="0" />
             <span class="val-display" id="pos-y-val">0m</span>
           </div>
           <div class="slider-row">
             <span class="axis-badge">Z</span>
-            <input type="range" id="pos-z-slider" class="styled-slider studio-slider" min="-120" max="120" value="0" />
+            <input type="range" id="pos-z-slider" class="styled-slider studio-slider" min="-250" max="250" value="0" />
             <span class="val-display" id="pos-z-val">0m</span>
           </div>
         </div>
@@ -94,12 +94,13 @@
           </div>
         </div>
 
-        <!-- Actions: Duplicate & Reset -->
+        <!-- Actions: Duplicate, Reset & Delete Clone -->
         <div class="studio-section">
           <div class="action-btn-group">
             <button class="studio-btn primary" id="btn-duplicate-target" title="Duplicate selected object with offset">📋 Duplicate</button>
             <button class="studio-btn secondary" id="btn-reset-target" title="Reset position and rotation to origin">↺ Reset</button>
           </div>
+          <button class="studio-btn danger" id="btn-delete-clone" style="display: none; margin-top: 5px;" title="Delete this duplicate clone">🗑️ Delete Clone</button>
           <div id="duplicate-status" class="duplicate-status"></div>
         </div>
 
@@ -124,48 +125,59 @@
 
     <!-- Top Right Combined Controls Card (Brightness + Sky Movement) -->
     <div class="top-controls-card" id="top-controls-card">
-      <!-- 1. Day to Night Brightness -->
-      <div class="control-row">
-        <span class="ctrl-icon moon-icon" id="btn-night" title="Night">🌙</span>
-        <input
-          type="range"
-          id="brightness-slider"
-          class="styled-slider brightness-slider"
-          min="0"
-          max="100"
-          value="85"
-          aria-label="Brightness Level Day to Night"
-        />
-        <span class="ctrl-icon sun-icon" id="btn-day" title="Day">☀️</span>
+      <!-- Minimize Header -->
+      <div class="top-controls-header" id="top-controls-header">
+        <div class="top-controls-title">
+          <span>☀️</span>
+          <span>Atmosphere & Sky</span>
+        </div>
+        <button class="top-controls-toggle-btn" id="top-controls-toggle-btn" title="Toggle Atmosphere Controls" aria-label="Toggle Atmosphere Controls">−</button>
       </div>
 
-      <!-- 2. Sky Cloud Rotation Speed -->
-      <div class="control-row">
-        <span class="ctrl-icon" id="btn-pause-sky" title="Pause Sky">⏸️</span>
-        <input
-          type="range"
-          id="sky-speed-slider"
-          class="styled-slider speed-slider"
-          min="0"
-          max="100"
-          value="35"
-          aria-label="Sky Cloud Speed"
-        />
-        <span class="ctrl-icon" id="btn-fast-sky" title="Fast Clouds">💨</span>
-      </div>
+      <div class="top-controls-body" id="top-controls-body">
+        <!-- 1. Day to Night Brightness -->
+        <div class="control-row">
+          <span class="ctrl-icon moon-icon" id="btn-night" title="Night">🌙</span>
+          <input
+            type="range"
+            id="brightness-slider"
+            class="styled-slider brightness-slider"
+            min="0"
+            max="100"
+            value="85"
+            aria-label="Brightness Level Day to Night"
+          />
+          <span class="ctrl-icon sun-icon" id="btn-day" title="Day">☀️</span>
+        </div>
 
-      <!-- 3. Sky Rotation Direction Pills -->
-      <div class="direction-pills" id="sky-direction-picker">
-        <button class="dir-btn active" data-dir="E_W" title="East to West">E → W</button>
-        <button class="dir-btn" data-dir="W_E" title="West to East">W → E</button>
-        <button class="dir-btn" data-dir="N_S" title="North to South">N → S</button>
-        <button class="dir-btn" data-dir="S_N" title="South to North">S → N</button>
-        <button class="dir-btn" data-dir="NE_SW" title="Northeast to Southwest">NE ↙</button>
-        <button class="dir-btn" data-dir="NW_SE" title="Northwest to Southeast">NW ↘</button>
-      </div>
+        <!-- 2. Sky Cloud Rotation Speed -->
+        <div class="control-row">
+          <span class="ctrl-icon" id="btn-pause-sky" title="Pause Sky">⏸️</span>
+          <input
+            type="range"
+            id="sky-speed-slider"
+            class="styled-slider speed-slider"
+            min="0"
+            max="100"
+            value="35"
+            aria-label="Sky Cloud Speed"
+          />
+          <span class="ctrl-icon" id="btn-fast-sky" title="Fast Clouds">💨</span>
+        </div>
 
-      <!-- 4. Mini Default Button (Reset to original position with 0 speed) -->
-      <button class="reset-sky-btn" id="btn-reset-sky" title="Reset Sky to Original Position with 0 Speed">↺ Default Sky</button>
+        <!-- 3. Sky Rotation Direction Pills -->
+        <div class="direction-pills" id="sky-direction-picker">
+          <button class="dir-btn active" data-dir="E_W" title="East to West">E → W</button>
+          <button class="dir-btn" data-dir="W_E" title="West to East">W → E</button>
+          <button class="dir-btn" data-dir="N_S" title="North to South">N → S</button>
+          <button class="dir-btn" data-dir="S_N" title="South to North">S → N</button>
+          <button class="dir-btn" data-dir="NE_SW" title="Northeast to Southwest">NE ↙</button>
+          <button class="dir-btn" data-dir="NW_SE" title="Northwest to Southeast">NW ↘</button>
+        </div>
+
+        <!-- 4. Mini Default Button (Reset to original position with 0 speed) -->
+        <button class="reset-sky-btn" id="btn-reset-sky" title="Reset Sky to Original Position with 0 Speed">↺ Default Sky</button>
+      </div>
     </div>
 
     <!-- Minimal Ground Switcher Column (Right Center) -->
