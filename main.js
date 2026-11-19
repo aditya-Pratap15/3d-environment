@@ -502,6 +502,32 @@ dirButtons.forEach((btn) => {
   });
 });
 
+// Mini Default Button: Resets sky to its original position with 0 speed
+const btnResetSky = document.getElementById('btn-reset-sky');
+if (btnResetSky) {
+  btnResetSky.addEventListener('click', () => {
+    // 1. Reset speed to 0
+    skyRotationSpeed = 0;
+    if (skySpeedSlider) skySpeedSlider.value = 0;
+
+    // 2. Reset direction to default 'E_W'
+    currentSkyDirection = 'E_W';
+    dirButtons.forEach((b) => {
+      if (b.dataset.dir === 'E_W') b.classList.add('active');
+      else b.classList.remove('active');
+    });
+
+    // 3. Reset Sky Dome orientation to original place
+    if (skyDome) {
+      skyDome.quaternion.set(0, 0, 0, 1);
+      skyDome.rotation.set(0, 0, 0);
+    }
+
+    // 4. Reset environment reflection rotation
+    scene.environmentRotation.set(0, 0, 0);
+  });
+}
+
 // 12. Animation Loop with Dynamic Sky & Reflection Movement
 let frameCount = 0;
 function animate() {

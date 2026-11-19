@@ -257,6 +257,40 @@ html, body {
   box-shadow: 0 0 8px rgba(56, 189, 248, 0.45);
 }
 
+/* Mini Default Reset Sky Button */
+.reset-sky-btn {
+  width: 100%;
+  margin-top: 3px;
+  background: rgba(30, 41, 59, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 0;
+  text-align: center;
+  cursor: pointer;
+  outline: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.reset-sky-btn:hover {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+  transform: translateY(-1px);
+}
+
+.reset-sky-btn:active {
+  transform: translateY(0);
+}
+
 /* Minimal Mini Square Ground Boxes (Right Center) */
 .ground-picker {
   position: fixed;
