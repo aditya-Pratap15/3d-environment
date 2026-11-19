@@ -42,6 +42,20 @@
       <span><strong>Scroll:</strong> Zoom</span>
     </div>
 
+    <!-- Top Right Day-to-Night Brightness Slider -->
+    <div class="brightness-control" id="brightness-control">
+      <span class="brightness-icon moon-icon" id="btn-night" title="Night">🌙</span>
+      <input
+        type="range"
+        id="brightness-slider"
+        min="0"
+        max="100"
+        value="85"
+        aria-label="Brightness Level Day to Night"
+      />
+      <span class="brightness-icon sun-icon" id="btn-day" title="Day">☀️</span>
+    </div>
+
     <!-- Minimal Ground Switcher Column (Right Center) -->
     <div class="ground-picker" id="ground-picker">
       <button class="ground-box active" data-ground="grass" style="--thumb: url('./textures/grass.jpg');" aria-label="Grass"></button>

@@ -184,19 +184,29 @@ const groundMat = new THREE.MeshStandardMaterial({
 });
 const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI / 2;
-ground.position.y = 0.0;
+ground.position.y = -0.05;
 ground.receiveShadow = true;
 scene.add(ground);
+
+const terrainMeshes = [];
 
 function switchGround(type) {
   const cfg = groundConfigs[type];
   if (!cfg || !loadedTextures[type]) return;
 
-  groundMat.map = loadedTextures[type];
+  const tex = loadedTextures[type];
+  tex.needsUpdate = true;
+
+  groundMat.map = tex;
   groundMat.color.setHex(cfg.color);
   groundMat.roughness = cfg.roughness;
   groundMat.metalness = cfg.metalness;
   groundMat.needsUpdate = true;
+
+  terrainMeshes.forEach((mesh) => {
+    mesh.material = groundMat;
+    mesh.material.needsUpdate = true;
+  });
 }
 
 // Minimal Mini Square Ground Box Switcher Handlers
@@ -280,16 +290,30 @@ gltfLoader.load(
     city.position.y = 0.0;
     city.position.z = -center.z * scale;
 
-    // Preserve and enhance all vibrant textures and colors
+    // Preserve and enhance all vibrant textures, and link terrain to ground material
     city.traverse((child) => {
       if (child.isMesh) {
         child.castShadow = true;
         child.receiveShadow = true;
-        if (child.material) {
-          // Keep all original textures, colors, and maps
-          child.material.roughness = Math.min(child.material.roughness ?? 0.5, 0.6);
-          child.material.metalness = child.material.metalness ?? 0.2;
-          child.material.envMapIntensity = 1.0;
+
+        const matName = (child.material?.name || '').toLowerCase();
+        const meshName = (child.name || '').toLowerCase();
+
+        if (matName.includes('terrain') || meshName.includes('terrain') || matName === '_104') {
+          child.material = groundMat;
+          terrainMeshes.push(child);
+        } else if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach((m) => {
+              m.roughness = Math.min(m.roughness ?? 0.5, 0.6);
+              m.metalness = m.metalness ?? 0.2;
+              m.envMapIntensity = 1.0;
+            });
+          } else {
+            child.material.roughness = Math.min(child.material.roughness ?? 0.5, 0.6);
+            child.material.metalness = child.material.metalness ?? 0.2;
+            child.material.envMapIntensity = 1.0;
+          }
         }
       }
     });
@@ -326,7 +350,75 @@ window.addEventListener('resize', () => {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 });
 
-// 10. Animation Loop
+// 10. Day-to-Night Brightness Slider Controller (Top-Right)
+const brightnessSlider = document.getElementById('brightness-slider');
+const btnNight = document.getElementById('btn-night');
+const btnDay = document.getElementById('btn-day');
+
+function setBrightnessLevel(val) {
+  const t = Math.max(0, Math.min(100, Number(val))) / 100;
+
+  // Exposure: Smooth dynamic range from deep night (0.35) to brilliant day (1.3)
+  renderer.toneMappingExposure = 0.35 + t * 0.95;
+
+  // Sun & Moon Directional Light
+  sunLight.intensity = 0.2 + t * 2.0;
+  sunLight.color.lerpColors(new THREE.Color(0x93c5fd), new THREE.Color(0xfffbeb), t);
+
+  // Sunlight angle lowers smoothly towards horizon as dusk arrives
+  const angle = (t * 0.35 + 0.15) * Math.PI;
+  sunLight.position.set(Math.cos(angle) * 220, Math.sin(angle) * 240 + 20, 120);
+
+  // Hemisphere Light (Sky & Ground)
+  hemiLight.intensity = 0.15 + t * 1.05;
+  hemiLight.color.lerpColors(new THREE.Color(0x1e293b), new THREE.Color(0xffffff), t);
+  hemiLight.groundColor.lerpColors(new THREE.Color(0x0f172a), new THREE.Color(0x64748b), t);
+
+  // Ambient Light
+  ambientLight.intensity = 0.12 + t * 0.58;
+  ambientLight.color.lerpColors(new THREE.Color(0x1e1b4b), new THREE.Color(0xffffff), t);
+
+  // Fill Light
+  fillLight.intensity = 0.08 + t * 0.72;
+
+  // Atmospheric Fog: Midnight navy to soft daylight blue
+  if (scene.fog) {
+    scene.fog.color.lerpColors(new THREE.Color(0x030712), new THREE.Color(0xcce7ff), t);
+  }
+
+  // HDR Sky background & IBL environment reflections
+  scene.backgroundIntensity = 0.08 + t * 0.92;
+  scene.environmentIntensity = 0.15 + t * 0.85;
+
+  if (scene.background && scene.background.isColor) {
+    scene.background.lerpColors(new THREE.Color(0x030712), new THREE.Color(0x7dd3fc), t);
+  }
+}
+
+if (brightnessSlider) {
+  brightnessSlider.addEventListener('input', (e) => {
+    setBrightnessLevel(e.target.value);
+  });
+}
+
+if (btnNight) {
+  btnNight.addEventListener('click', () => {
+    if (brightnessSlider) brightnessSlider.value = 0;
+    setBrightnessLevel(0);
+  });
+}
+
+if (btnDay) {
+  btnDay.addEventListener('click', () => {
+    if (brightnessSlider) brightnessSlider.value = 100;
+    setBrightnessLevel(100);
+  });
+}
+
+// Initial brightness setup (85% daylight)
+setBrightnessLevel(85);
+
+// 11. Animation Loop
 function animate() {
   requestAnimationFrame(animate);
   controls.update();
