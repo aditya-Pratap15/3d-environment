@@ -616,10 +616,8 @@ const studioHeader = document.getElementById('studio-header');
 
 // Presets DOM Elements
 const presetSelect = document.getElementById('preset-select');
-const btnSavePreset = document.getElementById('btn-save-preset');
-const btnNewPreset = document.getElementById('btn-new-preset');
+const btnCopyPreset = document.getElementById('btn-copy-preset');
 const btnExportPreset = document.getElementById('btn-export-preset');
-const btnDeletePreset = document.getElementById('btn-delete-preset');
 const presetStatus = document.getElementById('preset-status');
 
 // Built-in Default Presets
@@ -923,23 +921,24 @@ if (mountainStyleSelect) {
   });
 }
 
-// --- Preset Management System ---
-function loadStoredPresets() {
+// --- Preset Management System (Direct GitHub Sync) ---
+async function loadStoredPresets() {
   try {
-    const raw = localStorage.getItem('3d_env_presets');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      presetsData = { ...defaultPresets, ...parsed };
-    }
-    const savedActive = localStorage.getItem('3d_env_active_preset');
-    if (savedActive && presetsData[savedActive]) {
-      activePresetKey = savedActive;
+    const res = await fetch('./presets.json');
+    if (res.ok) {
+      const data = await res.json();
+      presetsData = { ...defaultPresets, ...data };
     }
   } catch (err) {
-    console.warn('Could not load presets from localStorage:', err);
+    console.warn('Could not fetch presets.json, using built-ins:', err);
+  }
+
+  const savedActive = localStorage.getItem('3d_env_active_preset');
+  if (savedActive && presetsData[savedActive]) {
+    activePresetKey = savedActive;
   }
   updatePresetDropdown();
-  if (activePresetKey !== 'default') {
+  if (activePresetKey !== 'default' && presetsData[activePresetKey]) {
     applyPreset(activePresetKey);
   }
 }
@@ -1056,21 +1055,25 @@ function applyPreset(key) {
   }
 }
 
-function saveCurrentPreset(key, customName = null) {
+function getCurrentSceneConfig() {
   const currentObjState = objectsRegistry.map((o) => ({
     id: o.id,
     type: o.type,
     name: o.name,
     isClone: o.isClone,
-    basePos: { x: o.basePos.x, y: o.basePos.y, z: o.basePos.z },
-    offset: { ...o.offset },
+    basePos: { x: Math.round(o.basePos.x), y: Math.round(o.basePos.y), z: Math.round(o.basePos.z) },
+    offset: {
+      x: Math.round(o.offset.x),
+      y: Math.round(o.offset.y),
+      z: Math.round(o.offset.z),
+      rotY: Math.round(o.offset.rotY),
+    },
   }));
 
-  const name = customName || presetsData[key]?.name || 'Custom Scene';
+  const activeName = presetsData[activePresetKey]?.name || 'Custom Scene';
 
-  presetsData[key] = {
-    name: name,
-    builtIn: presetsData[key]?.builtIn || false,
+  return {
+    name: activeName,
     brightness: Number(brightnessSlider?.value ?? 85),
     skySpeed: Number(skySpeedSlider?.value ?? 35),
     skyDirection: currentSkyDirection,
@@ -1078,23 +1081,6 @@ function saveCurrentPreset(key, customName = null) {
     mountainStyle: mountainStyleSelect?.value ?? 'natural',
     objects: currentObjState,
   };
-
-  // Persist into localStorage
-  const toStore = {};
-  Object.entries(presetsData).forEach(([k, val]) => {
-    if (!val.builtIn) toStore[k] = val;
-  });
-  localStorage.setItem('3d_env_presets', JSON.stringify(toStore));
-  localStorage.setItem('3d_env_active_preset', key);
-
-  updatePresetDropdown();
-
-  if (presetStatus) {
-    presetStatus.textContent = `✓ "${name}" saved! Auto-loads on open.`;
-    setTimeout(() => {
-      if (presetStatus) presetStatus.textContent = '';
-    }, 4500);
-  }
 }
 
 if (presetSelect) {
@@ -1103,64 +1089,65 @@ if (presetSelect) {
   });
 }
 
-if (btnSavePreset) {
-  btnSavePreset.addEventListener('click', () => {
-    saveCurrentPreset(activePresetKey);
-  });
-}
+if (btnCopyPreset) {
+  btnCopyPreset.addEventListener('click', async () => {
+    const config = getCurrentSceneConfig();
+    const jsonStr = JSON.stringify(config, null, 2);
 
-if (btnNewPreset) {
-  btnNewPreset.addEventListener('click', () => {
-    const name = prompt('Enter a name for the new preset:', `Preset #${Object.keys(presetsData).length + 1}`);
-    if (!name || !name.trim()) return;
-    const newKey = `preset_${Date.now()}`;
-    saveCurrentPreset(newKey, name.trim());
-    activePresetKey = newKey;
-    updatePresetDropdown();
-  });
-}
-
-if (btnDeletePreset) {
-  btnDeletePreset.addEventListener('click', () => {
-    const cur = presetsData[activePresetKey];
-    if (!cur) return;
-    if (cur.builtIn) {
-      alert('Built-in presets (Default, Sunset, Cyberpunk) cannot be deleted.');
-      return;
+    let copied = false;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(jsonStr);
+        copied = true;
+      } catch (err) {
+        console.warn('Clipboard writeText failed:', err);
+      }
     }
 
-    delete presetsData[activePresetKey];
-    const toStore = {};
-    Object.entries(presetsData).forEach(([k, val]) => {
-      if (!val.builtIn) toStore[k] = val;
-    });
-    localStorage.setItem('3d_env_presets', JSON.stringify(toStore));
-
-    // Fall back to default
-    activePresetKey = 'default';
-    updatePresetDropdown();
-    applyPreset('default');
+    if (!copied) {
+      const ta = document.createElement('textarea');
+      ta.value = jsonStr;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        copied = true;
+      } catch (e) {
+        console.error('Fallback copy failed', e);
+      }
+      document.body.removeChild(ta);
+    }
 
     if (presetStatus) {
-      presetStatus.textContent = `🗑️ "${cur.name}" deleted`;
+      presetStatus.textContent = copied
+        ? '✓ Config copied! Paste in chat to save in GitHub.'
+        : '⚠️ Copy failed. Click Download instead!';
       setTimeout(() => {
         if (presetStatus) presetStatus.textContent = '';
-      }, 3000);
+      }, 5000);
     }
   });
 }
 
 if (btnExportPreset) {
   btnExportPreset.addEventListener('click', () => {
-    const cur = presetsData[activePresetKey];
-    if (!cur) return;
-    const blob = new Blob([JSON.stringify(cur, null, 2)], { type: 'application/json' });
+    const config = getCurrentSceneConfig();
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `preset-${activePresetKey}.json`;
+    a.download = `preset-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+
+    if (presetStatus) {
+      presetStatus.textContent = '✓ Config downloaded! Send it in chat to bake into GitHub.';
+      setTimeout(() => {
+        if (presetStatus) presetStatus.textContent = '';
+      }, 5000);
+    }
   });
 }
 
