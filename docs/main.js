@@ -74,26 +74,98 @@ const fillLight = new THREE.DirectionalLight(0x93c5fd, 0.8);
 fillLight.position.set(-120, 90, -120);
 scene.add(fillLight);
 
-// 6. Ground Plane (Lush Green Grass Lawn)
+// 6. Multiple Grounds Setup
 const textureLoader = new THREE.TextureLoader();
-const grassTexture = textureLoader.load('./textures/grass.jpg');
-grassTexture.wrapS = THREE.RepeatWrapping;
-grassTexture.wrapT = THREE.RepeatWrapping;
-grassTexture.repeat.set(60, 60);
-grassTexture.colorSpace = THREE.SRGBColorSpace;
+
+const groundConfigs = {
+  grass: {
+    texture: './textures/grass.jpg',
+    repeat: [60, 60],
+    color: 0x86efac,
+    roughness: 0.85,
+    metalness: 0.05,
+  },
+  asphalt: {
+    texture: './textures/asphalt.jpg',
+    repeat: [70, 70],
+    color: 0x64748b,
+    roughness: 0.9,
+    metalness: 0.1,
+  },
+  sand: {
+    texture: './textures/sand.jpg',
+    repeat: [50, 50],
+    color: 0xfde047,
+    roughness: 0.95,
+    metalness: 0.0,
+  },
+  snow: {
+    texture: './textures/snow.jpg',
+    repeat: [50, 50],
+    color: 0xf8fafc,
+    roughness: 0.65,
+    metalness: 0.15,
+  },
+  water: {
+    texture: './textures/water.jpg',
+    repeat: [40, 40],
+    color: 0x38bdf8,
+    roughness: 0.1,
+    metalness: 0.85,
+  },
+  stone: {
+    texture: './textures/stone.jpg',
+    repeat: [50, 50],
+    color: 0xcfd8dc,
+    roughness: 0.8,
+    metalness: 0.1,
+  },
+};
+
+// Pre-load all ground textures for instant zero-latency live switching
+const loadedTextures = {};
+Object.entries(groundConfigs).forEach(([key, cfg]) => {
+  const tex = textureLoader.load(cfg.texture);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(cfg.repeat[0], cfg.repeat[1]);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  loadedTextures[key] = tex;
+});
 
 const groundGeo = new THREE.PlaneGeometry(2500, 2500);
 const groundMat = new THREE.MeshStandardMaterial({
-  map: grassTexture,
-  color: 0x86efac, // Vibrant spring lawn green tint
-  roughness: 0.85,
-  metalness: 0.05,
+  map: loadedTextures.grass,
+  color: groundConfigs.grass.color,
+  roughness: groundConfigs.grass.roughness,
+  metalness: groundConfigs.grass.metalness,
 });
 const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = 0.0;
 ground.receiveShadow = true;
 scene.add(ground);
+
+function switchGround(type) {
+  const cfg = groundConfigs[type];
+  if (!cfg || !loadedTextures[type]) return;
+
+  groundMat.map = loadedTextures[type];
+  groundMat.color.setHex(cfg.color);
+  groundMat.roughness = cfg.roughness;
+  groundMat.metalness = cfg.metalness;
+  groundMat.needsUpdate = true;
+}
+
+// Minimal Mini Square Ground Box Switcher Handlers
+const groundBoxes = document.querySelectorAll('.ground-box');
+groundBoxes.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    groundBoxes.forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    switchGround(btn.dataset.ground);
+  });
+});
 
 // Loading Progress Tracker
 let skyLoaded = false;
