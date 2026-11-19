@@ -15,8 +15,8 @@
       }
     }
     </script>
-    <script type="module" crossorigin src="./assets/index-DZ4Ummjk.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BaZhmTeo.css">
+    <script type="module" crossorigin src="./assets/index-qs5EvvCB.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BfibA_y8.css">
   </head>
   <body>
     <!-- Fullscreen 3D Canvas -->
@@ -41,6 +41,85 @@
       <span><strong>Right Click:</strong> Pan</span>
       <span>•</span>
       <span><strong>Scroll:</strong> Zoom</span>
+    </div>
+
+    <!-- Top Left Studio Settings & Transform Panel -->
+    <div class="studio-panel" id="studio-panel">
+      <!-- Header with Toggle Button -->
+      <div class="studio-header" id="studio-header">
+        <div class="studio-title">
+          <span>⚙️</span>
+          <span>Studio Controls</span>
+        </div>
+        <button class="studio-toggle-btn" id="studio-toggle-btn" title="Toggle Controls" aria-label="Toggle Studio Controls">−</button>
+      </div>
+
+      <div class="studio-body" id="studio-body">
+        <!-- Target Selector (Buildings vs Mountains) -->
+        <div class="studio-section">
+          <label class="section-label">Target Object</label>
+          <div class="target-toggle">
+            <button class="target-btn active" id="target-buildings-btn" data-target="buildings">🏙️ Buildings</button>
+            <button class="target-btn" id="target-mountains-btn" data-target="mountains">⛰️ Mountains</button>
+          </div>
+        </div>
+
+        <!-- Position Controls (X, Y Elevation, Z) -->
+        <div class="studio-section">
+          <label class="section-label">Position / Elevation</label>
+          <div class="slider-row">
+            <span class="axis-badge">X</span>
+            <input type="range" id="pos-x-slider" class="styled-slider studio-slider" min="-120" max="120" value="0" />
+            <span class="val-display" id="pos-x-val">0m</span>
+          </div>
+          <div class="slider-row">
+            <span class="axis-badge">Y</span>
+            <input type="range" id="pos-y-slider" class="styled-slider studio-slider" min="-20" max="60" value="0" />
+            <span class="val-display" id="pos-y-val">0m</span>
+          </div>
+          <div class="slider-row">
+            <span class="axis-badge">Z</span>
+            <input type="range" id="pos-z-slider" class="styled-slider studio-slider" min="-120" max="120" value="0" />
+            <span class="val-display" id="pos-z-val">0m</span>
+          </div>
+        </div>
+
+        <!-- Rotation Controls (Yaw) -->
+        <div class="studio-section">
+          <label class="section-label">Rotation</label>
+          <div class="slider-row">
+            <span class="axis-badge">↻</span>
+            <input type="range" id="rot-y-slider" class="styled-slider studio-slider" min="0" max="360" value="0" />
+            <span class="val-display" id="rot-y-val">0°</span>
+          </div>
+        </div>
+
+        <!-- Actions: Duplicate & Reset -->
+        <div class="studio-section">
+          <div class="action-btn-group">
+            <button class="studio-btn primary" id="btn-duplicate-target" title="Duplicate selected object with offset">📋 Duplicate</button>
+            <button class="studio-btn secondary" id="btn-reset-target" title="Reset position and rotation to origin">↺ Reset</button>
+          </div>
+          <div id="duplicate-status" class="duplicate-status"></div>
+        </div>
+
+        <!-- Mountain Style Selector (Independent from Ground) -->
+        <div class="studio-section">
+          <label class="section-label">⛰️ Mountain Style</label>
+          <select id="mountain-style-select" class="studio-select" aria-label="Select Mountain Style">
+            <option value="natural">🌿 Original Natural</option>
+            <option value="stone">🪨 Rocky Mountain</option>
+            <option value="snow">❄️ Snowy Peaks</option>
+            <option value="canyon">🏜️ Desert Canyon</option>
+            <option value="moss">🌲 Lush Forest / Moss</option>
+            <option value="autumn">🍁 Autumn Hills</option>
+            <option value="lava">🌋 Volcanic Lava</option>
+            <option value="sand">🏖️ Golden Sand</option>
+            <option value="marble">🏛️ Carrara Marble</option>
+            <option value="hexgrid">🔮 Cyberpunk Hex</option>
+          </select>
+        </div>
+      </div>
     </div>
 
     <!-- Top Right Combined Controls Card (Brightness + Sky Movement) -->

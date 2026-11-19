@@ -188,8 +188,6 @@ ground.position.y = -0.05;
 ground.receiveShadow = true;
 scene.add(ground);
 
-const terrainMeshes = [];
-
 function switchGround(type) {
   const cfg = groundConfigs[type];
   if (!cfg || !loadedTextures[type]) return;
@@ -202,11 +200,6 @@ function switchGround(type) {
   groundMat.roughness = cfg.roughness;
   groundMat.metalness = cfg.metalness;
   groundMat.needsUpdate = true;
-
-  terrainMeshes.forEach((mesh) => {
-    mesh.material = groundMat;
-    mesh.material.needsUpdate = true;
-  });
 }
 
 // Minimal Mini Square Ground Box Switcher Handlers
@@ -281,8 +274,25 @@ rgbeLoader.load(
   }
 );
 
-// 8. Load 3D Castelia Skyscraper City Model with full vibrant colors & textures
+// 8. Load 3D Castelia City Model & Separate Mountains from Buildings
 if (loaderDetails) loaderDetails.textContent = 'Loading 3D Castelia Skyscraper City...';
+
+const mountainGroup = new THREE.Group();
+mountainGroup.name = 'MountainGroup';
+
+const buildingsGroup = new THREE.Group();
+buildingsGroup.name = 'BuildingsGroup';
+
+const mMeshes = [];
+const bMeshes = [];
+
+const mountainMat = new THREE.MeshStandardMaterial({
+  roughness: 0.85,
+  metalness: 0.05,
+});
+
+let originalMountainMaterial = null;
+const baseModelPos = new THREE.Vector3(0, 0, 0);
 
 const gltfLoader = new GLTFLoader();
 gltfLoader.load(
@@ -296,14 +306,9 @@ gltfLoader.load(
 
     // Scale: original is ~273,000 units wide -> 0.0012 makes it ~327 meters wide
     const scale = 0.0012;
-    city.scale.set(scale, scale, scale);
+    baseModelPos.set(-center.x * scale, 0.0, -center.z * scale);
 
-    // Align city and terrain flush with the ground (no uplift / floating)
-    city.position.x = -center.x * scale;
-    city.position.y = 0.0;
-    city.position.z = -center.z * scale;
-
-    // Preserve and enhance all vibrant textures, and link terrain to ground material
+    // Traverse and separate terrain/mountains from buildings
     city.traverse((child) => {
       if (child.isMesh) {
         child.castShadow = true;
@@ -313,25 +318,42 @@ gltfLoader.load(
         const meshName = (child.name || '').toLowerCase();
 
         if (matName.includes('terrain') || meshName.includes('terrain') || matName === '_104') {
-          child.material = groundMat;
-          terrainMeshes.push(child);
-        } else if (child.material) {
-          if (Array.isArray(child.material)) {
-            child.material.forEach((m) => {
-              m.roughness = Math.min(m.roughness ?? 0.5, 0.6);
-              m.metalness = m.metalness ?? 0.2;
-              m.envMapIntensity = 1.0;
-            });
-          } else {
-            child.material.roughness = Math.min(child.material.roughness ?? 0.5, 0.6);
-            child.material.metalness = child.material.metalness ?? 0.2;
-            child.material.envMapIntensity = 1.0;
+          if (!originalMountainMaterial && child.material) {
+            originalMountainMaterial = child.material.clone();
           }
+          child._originalMaterial = child.material;
+          mMeshes.push(child);
+        } else {
+          if (child.material) {
+            if (Array.isArray(child.material)) {
+              child.material.forEach((m) => {
+                m.roughness = Math.min(m.roughness ?? 0.5, 0.6);
+                m.metalness = m.metalness ?? 0.2;
+                m.envMapIntensity = 1.0;
+              });
+            } else {
+              child.material.roughness = Math.min(child.material.roughness ?? 0.5, 0.6);
+              child.material.metalness = child.material.metalness ?? 0.2;
+              child.material.envMapIntensity = 1.0;
+            }
+          }
+          bMeshes.push(child);
         }
       }
     });
 
-    scene.add(city);
+    // Reparent into distinct standalone groups
+    mMeshes.forEach((m) => mountainGroup.add(m));
+    bMeshes.forEach((m) => buildingsGroup.add(m));
+
+    mountainGroup.scale.set(scale, scale, scale);
+    mountainGroup.position.copy(baseModelPos);
+
+    buildingsGroup.scale.set(scale, scale, scale);
+    buildingsGroup.position.copy(baseModelPos);
+
+    scene.add(mountainGroup);
+    scene.add(buildingsGroup);
 
     modelLoaded = true;
     if (loaderProgress) loaderProgress.style.width = '100%';
@@ -556,3 +578,193 @@ function animate() {
 }
 
 animate();
+
+// 13. Top Left Studio Controls: Independent Transform, Duplicate & Mountain Styles
+let currentTarget = 'buildings'; // 'buildings' | 'mountains'
+const targetTransforms = {
+  buildings: { x: 0, y: 0, z: 0, rotY: 0 },
+  mountains: { x: 0, y: 0, z: 0, rotY: 0 },
+};
+
+function getTargetGroup() {
+  return currentTarget === 'buildings' ? buildingsGroup : mountainGroup;
+}
+
+const targetBuildingsBtn = document.getElementById('target-buildings-btn');
+const targetMountainsBtn = document.getElementById('target-mountains-btn');
+const posXSlider = document.getElementById('pos-x-slider');
+const posYSlider = document.getElementById('pos-y-slider');
+const posZSlider = document.getElementById('pos-z-slider');
+const rotYSlider = document.getElementById('rot-y-slider');
+const posXVal = document.getElementById('pos-x-val');
+const posYVal = document.getElementById('pos-y-val');
+const posZVal = document.getElementById('pos-z-val');
+const rotYVal = document.getElementById('rot-y-val');
+const duplicateBtn = document.getElementById('btn-duplicate-target');
+const resetBtn = document.getElementById('btn-reset-target');
+const duplicateStatus = document.getElementById('duplicate-status');
+const mountainStyleSelect = document.getElementById('mountain-style-select');
+const studioPanel = document.getElementById('studio-panel');
+const studioToggleBtn = document.getElementById('studio-toggle-btn');
+const studioHeader = document.getElementById('studio-header');
+
+function updateSliderUI() {
+  const t = targetTransforms[currentTarget];
+  if (posXSlider) posXSlider.value = t.x;
+  if (posYSlider) posYSlider.value = t.y;
+  if (posZSlider) posZSlider.value = t.z;
+  if (rotYSlider) rotYSlider.value = t.rotY;
+
+  if (posXVal) posXVal.textContent = `${t.x}m`;
+  if (posYVal) posYVal.textContent = `${t.y}m`;
+  if (posZVal) posZVal.textContent = `${t.z}m`;
+  if (rotYVal) rotYVal.textContent = `${t.rotY}°`;
+}
+
+function applyTransform() {
+  const group = getTargetGroup();
+  const t = targetTransforms[currentTarget];
+
+  group.position.set(
+    baseModelPos.x + t.x,
+    baseModelPos.y + t.y,
+    baseModelPos.z + t.z
+  );
+  group.rotation.y = (t.rotY * Math.PI) / 180;
+}
+
+if (targetBuildingsBtn && targetMountainsBtn) {
+  targetBuildingsBtn.addEventListener('click', () => {
+    currentTarget = 'buildings';
+    targetBuildingsBtn.classList.add('active');
+    targetMountainsBtn.classList.remove('active');
+    updateSliderUI();
+  });
+
+  targetMountainsBtn.addEventListener('click', () => {
+    currentTarget = 'mountains';
+    targetMountainsBtn.classList.add('active');
+    targetBuildingsBtn.classList.remove('active');
+    updateSliderUI();
+  });
+}
+
+if (posXSlider) {
+  posXSlider.addEventListener('input', (e) => {
+    targetTransforms[currentTarget].x = Number(e.target.value);
+    if (posXVal) posXVal.textContent = `${e.target.value}m`;
+    applyTransform();
+  });
+}
+
+if (posYSlider) {
+  posYSlider.addEventListener('input', (e) => {
+    targetTransforms[currentTarget].y = Number(e.target.value);
+    if (posYVal) posYVal.textContent = `${e.target.value}m`;
+    applyTransform();
+  });
+}
+
+if (posZSlider) {
+  posZSlider.addEventListener('input', (e) => {
+    targetTransforms[currentTarget].z = Number(e.target.value);
+    if (posZVal) posZVal.textContent = `${e.target.value}m`;
+    applyTransform();
+  });
+}
+
+if (rotYSlider) {
+  rotYSlider.addEventListener('input', (e) => {
+    targetTransforms[currentTarget].rotY = Number(e.target.value);
+    if (rotYVal) rotYVal.textContent = `${e.target.value}°`;
+    applyTransform();
+  });
+}
+
+// Duplicate Object logic
+const duplicateCounts = { buildings: 0, mountains: 0 };
+if (duplicateBtn) {
+  duplicateBtn.addEventListener('click', () => {
+    const group = getTargetGroup();
+    duplicateCounts[currentTarget]++;
+    const count = duplicateCounts[currentTarget];
+
+    const clone = group.clone(true);
+    // Offset clone by distance so it appears alongside
+    const offsetDistance = count * 90;
+    clone.position.x = group.position.x + offsetDistance;
+    clone.position.z = group.position.z + (count % 2 === 0 ? 30 : -30);
+
+    scene.add(clone);
+
+    if (duplicateStatus) {
+      const name = currentTarget === 'buildings' ? 'Buildings' : 'Mountains';
+      duplicateStatus.textContent = `✓ ${name} duplicated (Clone #${count})`;
+      setTimeout(() => {
+        if (duplicateStatus) duplicateStatus.textContent = '';
+      }, 4000);
+    }
+  });
+}
+
+// Reset Object Transform logic
+if (resetBtn) {
+  resetBtn.addEventListener('click', () => {
+    targetTransforms[currentTarget] = { x: 0, y: 0, z: 0, rotY: 0 };
+    applyTransform();
+    updateSliderUI();
+  });
+}
+
+// Independent Mountain Style Switcher
+function switchMountainStyle(styleKey) {
+  if (styleKey === 'natural') {
+    mMeshes.forEach((mesh) => {
+      if (mesh._originalMaterial) {
+        mesh.material = mesh._originalMaterial;
+      }
+    });
+    return;
+  }
+
+  const tex = loadedTextures[styleKey];
+  if (!tex) return;
+
+  const cfg = groundConfigs[styleKey];
+  mountainMat.map = tex;
+  mountainMat.roughness = cfg?.roughness ?? 0.85;
+  mountainMat.metalness = cfg?.metalness ?? 0.05;
+  mountainMat.color.setHex(0xffffff);
+  mountainMat.needsUpdate = true;
+
+  mMeshes.forEach((mesh) => {
+    mesh.material = mountainMat;
+  });
+}
+
+if (mountainStyleSelect) {
+  mountainStyleSelect.addEventListener('change', (e) => {
+    switchMountainStyle(e.target.value);
+  });
+}
+
+// Studio Panel Collapse Toggle
+if (studioToggleBtn && studioPanel) {
+  const togglePanel = () => {
+    studioPanel.classList.toggle('collapsed');
+    studioToggleBtn.textContent = studioPanel.classList.contains('collapsed') ? '⚙️' : '−';
+  };
+
+  studioToggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    togglePanel();
+  });
+
+  if (studioHeader) {
+    studioHeader.addEventListener('click', () => {
+      if (studioPanel.classList.contains('collapsed')) {
+        togglePanel();
+      }
+    });
+  }
+}
