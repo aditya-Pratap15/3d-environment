@@ -93,21 +93,27 @@ function updateAssetLighting() {
     R * cosElev * Math.cos(theta)
   );
 
-  // Asset direct illumination: 0 to 3.2 intensity
+  // Asset direct illumination: 0 to 3.5 intensity (purely controlled by assetBrightness)
+  // Decoupled from shadow darkness so shadows remain at desired darkness regardless of sun brightness
   const brightFactor = currentAssetBrightness / 100;
-  sunLight.intensity = brightFactor * 3.2;
+  sunLight.intensity = brightFactor * 3.5;
 
-  // Shadow darkness controls ambient & fill lighting levels
-  // 100% darkness = low ambient (crisp, deep pitch-black shadows)
-  // 0% darkness = high ambient (soft, light, translucent shadows)
-  const darknessFactor = currentShadowDarkness / 100;
-  const ambientLevel = THREE.MathUtils.lerp(1.35, 0.03, darknessFactor);
-  const hemiLevel = THREE.MathUtils.lerp(1.45, 0.04, darknessFactor);
-  const fillLevel = THREE.MathUtils.lerp(0.85, 0.01, darknessFactor);
+  // Shadow Darkness: 0% = faded/translucent shadow, 100% = deep pitch-black ink shadow
+  // Decoupled from sun brightness & provides full dynamic range from faded to dark black
+  const darknessFactor = Math.max(0, Math.min(100, currentShadowDarkness)) / 100;
 
-  ambientLight.intensity = ambientLevel;
-  hemiLight.intensity = hemiLevel;
-  fillLight.intensity = fillLevel;
+  // 1. Three.js native directional shadow intensity: 0.04 (nearly invisible/faded) to 1.0 (full occlusion)
+  sunLight.shadow.intensity = THREE.MathUtils.lerp(0.04, 1.0, darknessFactor);
+
+  // 2. Ambient, fill, and HDR indirect lighting falloff
+  // Using an exponential perceptual curve so shadows smoothly transition from soft daylight tint
+  // all the way down to true 0.0 (absolute pure pitch black at 100%)
+  const invDark = Math.pow(Math.max(0, 1.0 - darknessFactor), 2.4);
+
+  ambientLight.intensity = invDark * 1.35;
+  hemiLight.intensity = invDark * 1.45;
+  fillLight.intensity = invDark * 0.85;
+  scene.environmentIntensity = invDark * 0.85;
 
   // Sync Slider UI if elements exist
   const saSlider = document.getElementById('sun-angle-slider');
@@ -486,9 +492,8 @@ function setBrightnessLevel(val) {
     scene.fog.color.lerpColors(new THREE.Color(0x030712), new THREE.Color(0xcce7ff), t);
   }
 
-  // HDR Sky background & IBL environment reflections
+  // HDR Sky background
   scene.backgroundIntensity = 0.08 + t * 0.92;
-  scene.environmentIntensity = 0.15 + t * 0.85;
 
   // Sky Dome direct dynamic day-to-night lighting & tint
   if (skyDome && skyDome.material) {
