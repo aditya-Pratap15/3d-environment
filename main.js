@@ -85,12 +85,19 @@ const groundConfigs = {
     roughness: 0.85,
     metalness: 0.05,
   },
-  asphalt: {
-    texture: './textures/asphalt.jpg',
-    repeat: [70, 70],
-    color: 0x64748b,
+  moss: {
+    texture: './textures/moss.jpg',
+    repeat: [45, 45],
+    color: 0x4ade80,
     roughness: 0.9,
-    metalness: 0.1,
+    metalness: 0.05,
+  },
+  autumn: {
+    texture: './textures/autumn.jpg',
+    repeat: [40, 40],
+    color: 0xfbbf24,
+    roughness: 0.85,
+    metalness: 0.05,
   },
   sand: {
     texture: './textures/sand.jpg',
@@ -98,6 +105,13 @@ const groundConfigs = {
     color: 0xfde047,
     roughness: 0.95,
     metalness: 0.0,
+  },
+  canyon: {
+    texture: './textures/canyon.jpg',
+    repeat: [40, 40],
+    color: 0xfb923c,
+    roughness: 0.92,
+    metalness: 0.02,
   },
   snow: {
     texture: './textures/snow.jpg',
@@ -110,8 +124,8 @@ const groundConfigs = {
     texture: './textures/water.jpg',
     repeat: [40, 40],
     color: 0x38bdf8,
-    roughness: 0.1,
-    metalness: 0.85,
+    roughness: 0.08,
+    metalness: 0.88,
   },
   stone: {
     texture: './textures/stone.jpg',
@@ -119,6 +133,34 @@ const groundConfigs = {
     color: 0xcfd8dc,
     roughness: 0.8,
     metalness: 0.1,
+  },
+  asphalt: {
+    texture: './textures/asphalt.jpg',
+    repeat: [70, 70],
+    color: 0x64748b,
+    roughness: 0.9,
+    metalness: 0.1,
+  },
+  lava: {
+    texture: './textures/lava.jpg',
+    repeat: [40, 40],
+    color: 0xffffff,
+    roughness: 0.7,
+    metalness: 0.25,
+  },
+  hexgrid: {
+    texture: './textures/hexgrid.jpg',
+    repeat: [50, 50],
+    color: 0xffffff,
+    roughness: 0.35,
+    metalness: 0.65,
+  },
+  marble: {
+    texture: './textures/marble.jpg',
+    repeat: [35, 35],
+    color: 0xffffff,
+    roughness: 0.15,
+    metalness: 0.45,
   },
 };
 

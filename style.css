@@ -130,25 +130,33 @@ html, body {
 /* Minimal Mini Square Ground Boxes (Right Center) */
 .ground-picker {
   position: fixed;
-  right: 22px;
+  right: 18px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   z-index: 20;
-  padding: 8px;
+  padding: 8px 6px;
   background: rgba(15, 23, 42, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  max-height: 85vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+
+.ground-picker::-webkit-scrollbar {
+  display: none;
 }
 
 .ground-box {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 6px;
   background-image: var(--thumb);
   background-size: cover;
@@ -158,18 +166,19 @@ html, body {
   outline: none;
   padding: 0;
   margin: 0;
+  flex-shrink: 0;
   transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.18s ease, box-shadow 0.18s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
 .ground-box:hover {
-  transform: scale(1.12);
+  transform: scale(1.15);
   border-color: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55);
 }
 
 .ground-box.active {
-  transform: scale(1.12);
+  transform: scale(1.15);
   border-color: #38bdf8;
-  box-shadow: 0 0 14px rgba(56, 189, 248, 0.6), 0 3px 10px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.7), 0 2px 8px rgba(0, 0, 0, 0.45);
 }
