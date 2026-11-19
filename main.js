@@ -237,15 +237,28 @@ function checkLoadingDone() {
   }
 }
 
-// 7. Load 4K HDR Sky (from user's HdriFree asset)
+// 7. Load 4K HDR Sky (with 3D Sky Dome for full rotation, cloud movement & infinite depth)
 if (loaderDetails) loaderDetails.textContent = 'Loading 4K Sky Environment...';
+
+const skyGeo = new THREE.SphereGeometry(1800, 64, 32);
+const skyMat = new THREE.MeshBasicMaterial({
+  side: THREE.BackSide,
+  depthWrite: false,
+  fog: false,
+});
+const skyDome = new THREE.Mesh(skyGeo, skyMat);
+skyDome.renderOrder = -1000;
+scene.add(skyDome);
 
 const rgbeLoader = new RGBELoader();
 rgbeLoader.load(
   './hdri/FluffballDay4k.hdr',
   (texture) => {
     texture.mapping = THREE.EquirectangularReflectionMapping;
-    scene.background = texture;
+    skyMat.map = texture;
+    skyMat.needsUpdate = true;
+
+    // Generate IBL environment for realistic reflections on buildings and ground
     const envMap = pmremGenerator.fromEquirectangular(texture).texture;
     scene.environment = envMap;
     pmremGenerator.dispose();
@@ -262,7 +275,7 @@ rgbeLoader.load(
   },
   (err) => {
     console.warn('HDR sky fallback to atmospheric sky color:', err);
-    scene.background = new THREE.Color(0x7dd3fc);
+    skyMat.color.setHex(0x7dd3fc);
     skyLoaded = true;
     checkLoadingDone();
   }
@@ -390,6 +403,18 @@ function setBrightnessLevel(val) {
   scene.backgroundIntensity = 0.08 + t * 0.92;
   scene.environmentIntensity = 0.15 + t * 0.85;
 
+  // Sky Dome direct dynamic day-to-night lighting & tint
+  if (skyDome && skyDome.material) {
+    const skyB = 0.08 + t * 0.92;
+    if (t < 0.25) {
+      skyDome.material.color.setRGB(skyB * 0.75, skyB * 0.85, skyB * 1.05);
+    } else if (t < 0.55) {
+      skyDome.material.color.setRGB(skyB * 1.05, skyB * 0.95, skyB * 0.85);
+    } else {
+      skyDome.material.color.setRGB(skyB, skyB, skyB);
+    }
+  }
+
   if (scene.background && scene.background.isColor) {
     scene.background.lerpColors(new THREE.Color(0x030712), new THREE.Color(0x7dd3fc), t);
   }
@@ -419,9 +444,8 @@ if (btnDay) {
 setBrightnessLevel(85);
 
 // 11. Sky & Cloud Rotation Controller (Speed & 3D Direction)
-let skyRotationSpeed = 0.0006; // Default gentle natural cloud drift
+let skyRotationSpeed = 0.0014; // Visible, smooth natural cloud drift
 let currentSkyDirection = 'E_W';
-const skyQuat = new THREE.Quaternion();
 const deltaQuat = new THREE.Quaternion();
 
 // 3D Rotation Axes for natural compass trajectories:
@@ -443,9 +467,9 @@ const btnPauseSky = document.getElementById('btn-pause-sky');
 const btnFastSky = document.getElementById('btn-fast-sky');
 
 function updateSkySpeed(val) {
-  // 0 -> paused, 25 -> 0.0006 (gentle drift), 100 -> 0.0035 (fast time-lapse)
+  // 0 -> paused, 35 -> 0.0014 (smooth visible drift), 100 -> 0.0045 (fast time-lapse)
   const v = Math.max(0, Math.min(100, Number(val)));
-  skyRotationSpeed = (v / 100) * 0.0035;
+  skyRotationSpeed = (v / 100) * 0.0045;
 }
 
 if (skySpeedSlider) {
@@ -484,19 +508,22 @@ function animate() {
   requestAnimationFrame(animate);
   controls.update();
 
-  // Smoothly rotate the sky dome & reflections if speed > 0
-  if (skyRotationSpeed > 0 && scene.background) {
-    const axis = directionAxes[currentSkyDirection] || directionAxes.E_W;
-    deltaQuat.setFromAxisAngle(axis, skyRotationSpeed);
-    skyQuat.multiply(deltaQuat);
+  // Position SkyDome centered on camera (infinite distance effect) & rotate
+  if (skyDome) {
+    skyDome.position.copy(camera.position);
 
-    frameCount++;
-    if (frameCount % 600 === 0) {
-      skyQuat.normalize();
+    if (skyRotationSpeed > 0) {
+      const axis = directionAxes[currentSkyDirection] || directionAxes.E_W;
+      deltaQuat.setFromAxisAngle(axis, skyRotationSpeed);
+      skyDome.quaternion.multiply(deltaQuat);
+
+      frameCount++;
+      if (frameCount % 600 === 0) {
+        skyDome.quaternion.normalize();
+      }
+
+      scene.environmentRotation.setFromQuaternion(skyDome.quaternion);
     }
-
-    scene.backgroundRotation.setFromQuaternion(skyQuat);
-    scene.environmentRotation.copy(scene.backgroundRotation);
   }
 
   renderer.render(scene, camera);
