@@ -290,11 +290,12 @@ function switchGround(type) {
 // Minimal Mini Square Ground Box Switcher Handlers
 const groundBoxes = document.querySelectorAll('.ground-box');
 groundBoxes.forEach((btn) => {
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', (e) => {
+    const targetBtn = e.currentTarget || btn;
     if (typeof pushHistoryState === 'function') pushHistoryState();
     groundBoxes.forEach((b) => b.classList.remove('active'));
-    btn.classList.add('active');
-    switchGround(btn.dataset.ground);
+    targetBtn.classList.add('active');
+    switchGround(targetBtn.dataset.ground);
   });
 });
 
