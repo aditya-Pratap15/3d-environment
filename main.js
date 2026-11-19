@@ -217,6 +217,7 @@ function switchGround(type) {
 const groundBoxes = document.querySelectorAll('.ground-box');
 groundBoxes.forEach((btn) => {
   btn.addEventListener('click', () => {
+    if (typeof pushHistoryState === 'function') pushHistoryState();
     groundBoxes.forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     switchGround(btn.dataset.ground);
@@ -463,6 +464,7 @@ if (brightnessSlider) {
 
 if (btnNight) {
   btnNight.addEventListener('click', () => {
+    if (typeof pushHistoryState === 'function') pushHistoryState();
     if (brightnessSlider) brightnessSlider.value = 0;
     setBrightnessLevel(0);
   });
@@ -470,6 +472,7 @@ if (btnNight) {
 
 if (btnDay) {
   btnDay.addEventListener('click', () => {
+    if (typeof pushHistoryState === 'function') pushHistoryState();
     if (brightnessSlider) brightnessSlider.value = 100;
     setBrightnessLevel(100);
   });
@@ -532,6 +535,7 @@ if (btnFastSky) {
 const dirButtons = document.querySelectorAll('.dir-btn');
 dirButtons.forEach((btn) => {
   btn.addEventListener('click', () => {
+    if (typeof pushHistoryState === 'function') pushHistoryState();
     dirButtons.forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     currentSkyDirection = btn.dataset.dir || 'E_W';
@@ -542,6 +546,7 @@ dirButtons.forEach((btn) => {
 const btnResetSky = document.getElementById('btn-reset-sky');
 if (btnResetSky) {
   btnResetSky.addEventListener('click', () => {
+    if (typeof pushHistoryState === 'function') pushHistoryState();
     // 1. Reset speed to 0
     skyRotationSpeed = 0;
     if (skySpeedSlider) skySpeedSlider.value = 0;
@@ -634,7 +639,9 @@ const posZVal = document.getElementById('pos-z-val');
 const rotYVal = document.getElementById('rot-y-val');
 const duplicateBtn = document.getElementById('btn-duplicate-target');
 const resetBtn = document.getElementById('btn-reset-target');
-const deleteCloneBtn = document.getElementById('btn-delete-clone');
+const deleteTargetBtn = document.getElementById('btn-delete-target');
+const btnUndo = document.getElementById('btn-undo');
+const btnRedo = document.getElementById('btn-redo');
 const duplicateStatus = document.getElementById('duplicate-status');
 const mountainStyleSelect = document.getElementById('mountain-style-select');
 const studioPanel = document.getElementById('studio-panel');
@@ -735,12 +742,27 @@ function initObjectsRegistry() {
 }
 
 function getSelectedObject() {
-  return objectsRegistry.find((o) => o.id === selectedObjectId) || objectsRegistry[0];
+  return objectsRegistry.find((o) => o.id === selectedObjectId) || (objectsRegistry.length > 0 ? objectsRegistry[0] : null);
 }
 
 function updateObjectSelectOptions() {
   if (!activeObjectSelect) return;
   activeObjectSelect.innerHTML = '';
+
+  if (objectsRegistry.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '(No Objects in Scene)';
+    activeObjectSelect.appendChild(opt);
+    if (deleteTargetBtn) deleteTargetBtn.disabled = true;
+    if (duplicateBtn) duplicateBtn.disabled = true;
+    if (resetBtn) resetBtn.disabled = true;
+    return;
+  }
+
+  if (deleteTargetBtn) deleteTargetBtn.disabled = false;
+  if (duplicateBtn) duplicateBtn.disabled = false;
+  if (resetBtn) resetBtn.disabled = false;
 
   objectsRegistry.forEach((obj) => {
     const opt = document.createElement('option');
@@ -749,16 +771,17 @@ function updateObjectSelectOptions() {
     if (obj.id === selectedObjectId) opt.selected = true;
     activeObjectSelect.appendChild(opt);
   });
-
-  const cur = getSelectedObject();
-  if (deleteCloneBtn) {
-    deleteCloneBtn.style.display = cur && cur.isClone ? 'block' : 'none';
-  }
 }
 
 function updateSliderUI() {
   const obj = getSelectedObject();
-  if (!obj) return;
+  if (!obj) {
+    if (posXVal) posXVal.textContent = '0m';
+    if (posYVal) posYVal.textContent = '0m';
+    if (posZVal) posZVal.textContent = '0m';
+    if (rotYVal) rotYVal.textContent = '0°';
+    return;
+  }
 
   const off = obj.offset;
   if (posXSlider) posXSlider.value = off.x;
@@ -839,12 +862,233 @@ if (rotYSlider) {
   });
 }
 
+// =====================================================================
+// --- Universal Undo / Redo History Stack ---
+// =====================================================================
+const undoStack = [];
+const redoStack = [];
+const MAX_UNDO = 50;
+
+function updateHistoryButtons() {
+  if (btnUndo) {
+    btnUndo.disabled = undoStack.length === 0;
+  }
+  if (btnRedo) {
+    btnRedo.disabled = redoStack.length === 0;
+  }
+}
+
+function captureSnapshot() {
+  return {
+    objects: objectsRegistry.map((o) => ({
+      id: o.id,
+      type: o.type,
+      name: o.name,
+      isClone: o.isClone,
+      basePos: { x: o.basePos.x, y: o.basePos.y, z: o.basePos.z },
+      offset: { x: o.offset.x, y: o.offset.y, z: o.offset.z, rotY: o.offset.rotY },
+    })),
+    selectedObjectId: selectedObjectId,
+    groundType: currentGroundType,
+    mountainStyle: mountainStyleSelect ? mountainStyleSelect.value : 'natural',
+    brightness: brightnessSlider ? Number(brightnessSlider.value) : 57,
+    skySpeed: skySpeedSlider ? Number(skySpeedSlider.value) : 35,
+    skyDirection: currentSkyDirection,
+  };
+}
+
+function pushHistoryState(explicitSnapshot = null) {
+  const snap = explicitSnapshot || captureSnapshot();
+  undoStack.push(snap);
+  if (undoStack.length > MAX_UNDO) {
+    undoStack.shift();
+  }
+  redoStack.length = 0;
+  updateHistoryButtons();
+}
+
+function restoreSnapshot(snap) {
+  if (!snap) return;
+
+  // 1. Remove all current clones from scene
+  objectsRegistry.forEach((o) => {
+    if (o.isClone) {
+      scene.remove(o.group);
+    }
+  });
+
+  // Ensure base groups are present or removed according to snapshot
+  const hasBaseBuildings = snap.objects.some((o) => !o.isClone && o.type === 'buildings');
+  if (hasBaseBuildings) {
+    if (!scene.children.includes(buildingsGroup)) scene.add(buildingsGroup);
+  } else {
+    scene.remove(buildingsGroup);
+  }
+
+  const hasBaseMountains = snap.objects.some((o) => !o.isClone && o.type === 'mountains');
+  if (hasBaseMountains) {
+    if (!scene.children.includes(mountainGroup)) scene.add(mountainGroup);
+  } else {
+    scene.remove(mountainGroup);
+  }
+
+  // 2. Reconstruct objectsRegistry
+  const newRegistry = [];
+
+  snap.objects.forEach((objData) => {
+    let grp;
+    const basePos = new THREE.Vector3(objData.basePos.x, objData.basePos.y, objData.basePos.z);
+
+    if (!objData.isClone) {
+      grp = objData.type === 'buildings' ? buildingsGroup : mountainGroup;
+    } else {
+      const srcGroup = objData.type === 'buildings' ? buildingsGroup : mountainGroup;
+      grp = srcGroup.clone(true);
+      scene.add(grp);
+    }
+
+    grp.position.set(
+      basePos.x + objData.offset.x,
+      basePos.y + objData.offset.y,
+      basePos.z + objData.offset.z
+    );
+    grp.rotation.y = (objData.offset.rotY * Math.PI) / 180;
+
+    newRegistry.push({
+      id: objData.id,
+      type: objData.type,
+      name: objData.name,
+      isClone: objData.isClone,
+      group: grp,
+      basePos: basePos,
+      offset: { ...objData.offset },
+    });
+  });
+
+  objectsRegistry = newRegistry;
+  selectedObjectId = snap.selectedObjectId;
+  if (!objectsRegistry.some((o) => o.id === selectedObjectId)) {
+    selectedObjectId = objectsRegistry.length > 0 ? objectsRegistry[0].id : null;
+  }
+
+  updateObjectSelectOptions();
+  updateSliderUI();
+
+  // 3. Ground Texture
+  if (snap.groundType && snap.groundType !== currentGroundType) {
+    switchGround(snap.groundType);
+  }
+
+  // 4. Mountain Style
+  if (snap.mountainStyle && mountainStyleSelect) {
+    mountainStyleSelect.value = snap.mountainStyle;
+    switchMountainStyle(snap.mountainStyle);
+  }
+
+  // 5. Brightness
+  if (snap.brightness !== undefined) {
+    if (brightnessSlider) brightnessSlider.value = snap.brightness;
+    setBrightnessLevel(snap.brightness);
+  }
+
+  // 6. Sky Speed & Direction
+  if (snap.skySpeed !== undefined) {
+    if (skySpeedSlider) skySpeedSlider.value = snap.skySpeed;
+    updateSkySpeed(snap.skySpeed);
+  }
+  if (snap.skyDirection) {
+    currentSkyDirection = snap.skyDirection;
+    dirButtons.forEach((b) => {
+      if (b.dataset.dir === snap.skyDirection) b.classList.add('active');
+      else b.classList.remove('active');
+    });
+  }
+}
+
+function undo() {
+  if (undoStack.length === 0) return;
+  const currentSnap = captureSnapshot();
+  redoStack.push(currentSnap);
+  const prevSnap = undoStack.pop();
+  restoreSnapshot(prevSnap);
+  updateHistoryButtons();
+
+  if (duplicateStatus) {
+    duplicateStatus.textContent = '↩️ Undo performed';
+    setTimeout(() => { if (duplicateStatus) duplicateStatus.textContent = ''; }, 2000);
+  }
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  const currentSnap = captureSnapshot();
+  undoStack.push(currentSnap);
+  const nextSnap = redoStack.pop();
+  restoreSnapshot(nextSnap);
+  updateHistoryButtons();
+
+  if (duplicateStatus) {
+    duplicateStatus.textContent = '↪️ Redo performed';
+    setTimeout(() => { if (duplicateStatus) duplicateStatus.textContent = ''; }, 2000);
+  }
+}
+
+if (btnUndo) {
+  btnUndo.addEventListener('click', undo);
+}
+
+if (btnRedo) {
+  btnRedo.addEventListener('click', redo);
+}
+
+// Global Keyboard Shortcut Listener for Undo / Redo
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' && e.target.type === 'text') return;
+
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+    if (e.shiftKey) {
+      e.preventDefault();
+      redo();
+    } else {
+      e.preventDefault();
+      undo();
+    }
+  } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
+    e.preventDefault();
+    redo();
+  }
+});
+
+// Helper for slider drag history (records 1 clean history step per drag)
+function attachSliderHistory(sliderEl) {
+  if (!sliderEl) return;
+  let beforeDragSnap = null;
+  sliderEl.addEventListener('pointerdown', () => {
+    beforeDragSnap = captureSnapshot();
+  });
+  sliderEl.addEventListener('change', () => {
+    if (beforeDragSnap) {
+      pushHistoryState(beforeDragSnap);
+      beforeDragSnap = null;
+    }
+  });
+}
+
+attachSliderHistory(posXSlider);
+attachSliderHistory(posYSlider);
+attachSliderHistory(posZSlider);
+attachSliderHistory(rotYSlider);
+attachSliderHistory(brightnessSlider);
+attachSliderHistory(skySpeedSlider);
+
 // Duplicate Object logic (Instantly selectable and movable)
 const cloneCounters = { buildings: 0, mountains: 0 };
 if (duplicateBtn) {
   duplicateBtn.addEventListener('click', () => {
     const srcObj = getSelectedObject();
     if (!srcObj || !srcObj.group) return;
+
+    pushHistoryState();
 
     cloneCounters[srcObj.type]++;
     const count = cloneCounters[srcObj.type];
@@ -880,7 +1124,7 @@ if (duplicateBtn) {
     updateSliderUI();
 
     if (duplicateStatus) {
-      duplicateStatus.textContent = `✓ ${cloneName} created & active! Use sliders to move.`;
+      duplicateStatus.textContent = `✓ ${cloneName} created! Use sliders to move.`;
       setTimeout(() => {
         if (duplicateStatus) duplicateStatus.textContent = '';
       }, 4500);
@@ -888,30 +1132,31 @@ if (duplicateBtn) {
   });
 }
 
-// Delete Clone logic
-if (deleteCloneBtn) {
-  deleteCloneBtn.addEventListener('click', () => {
+// Delete Target Object logic (Supports main buildings, main mountains, and all clones)
+if (deleteTargetBtn) {
+  deleteTargetBtn.addEventListener('click', () => {
+    if (!selectedObjectId || objectsRegistry.length === 0) return;
+
     const idx = objectsRegistry.findIndex((o) => o.id === selectedObjectId);
     if (idx === -1) return;
 
-    const obj = objectsRegistry[idx];
-    if (!obj.isClone) return;
+    pushHistoryState();
 
+    const obj = objectsRegistry[idx];
     scene.remove(obj.group);
     objectsRegistry.splice(idx, 1);
 
-    // Fall back to main original object of same type
-    const fallback = objectsRegistry.find((o) => o.type === obj.type) || objectsRegistry[0];
-    selectedObjectId = fallback.id;
+    const deletedName = obj.name;
+    selectedObjectId = objectsRegistry.length > 0 ? objectsRegistry[0].id : null;
 
     updateObjectSelectOptions();
     updateSliderUI();
 
     if (duplicateStatus) {
-      duplicateStatus.textContent = `🗑️ ${obj.name} removed`;
+      duplicateStatus.textContent = `🗑️ "${deletedName}" deleted (Undo to restore)`;
       setTimeout(() => {
         if (duplicateStatus) duplicateStatus.textContent = '';
-      }, 3000);
+      }, 4000);
     }
   });
 }
@@ -921,6 +1166,7 @@ if (resetBtn) {
   resetBtn.addEventListener('click', () => {
     const obj = getSelectedObject();
     if (obj) {
+      pushHistoryState();
       obj.offset = { x: 0, y: 0, z: 0, rotY: 0 };
       applyTransform();
       updateSliderUI();
@@ -956,6 +1202,7 @@ function switchMountainStyle(styleKey) {
 
 if (mountainStyleSelect) {
   mountainStyleSelect.addEventListener('change', (e) => {
+    pushHistoryState();
     switchMountainStyle(e.target.value);
   });
 }

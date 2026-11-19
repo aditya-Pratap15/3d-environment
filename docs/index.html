@@ -15,8 +15,8 @@
       }
     }
     </script>
-    <script type="module" crossorigin src="./assets/index-Bt8gFrr_.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CwZRFgn4.css">
+    <script type="module" crossorigin src="./assets/index-B4jKIGHN.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DntX75WK.css">
   </head>
   <body>
     <!-- Fullscreen 3D Canvas -->
@@ -55,6 +55,14 @@
       </div>
 
       <div class="studio-body" id="studio-body">
+        <!-- Universal Undo / Redo Actions -->
+        <div class="studio-section" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px;">
+          <div class="action-btn-group">
+            <button class="studio-btn history-btn" id="btn-undo" title="Undo last action (Ctrl+Z)" disabled>↩️ Undo</button>
+            <button class="studio-btn history-btn" id="btn-redo" title="Redo action (Ctrl+Y)" disabled>↪️ Redo</button>
+          </div>
+        </div>
+
         <!-- Presets & Saved Scenes Section -->
         <div class="studio-section">
           <label class="section-label">💾 GitHub Presets</label>
@@ -109,13 +117,13 @@
           </div>
         </div>
 
-        <!-- Actions: Duplicate, Reset & Delete Clone -->
+        <!-- Actions: Duplicate, Reset & Delete Target Object -->
         <div class="studio-section">
           <div class="action-btn-group">
             <button class="studio-btn primary" id="btn-duplicate-target" title="Duplicate selected object with offset">📋 Duplicate</button>
             <button class="studio-btn secondary" id="btn-reset-target" title="Reset position and rotation to origin">↺ Reset</button>
           </div>
-          <button class="studio-btn danger" id="btn-delete-clone" style="display: none; margin-top: 5px;" title="Delete this duplicate clone">🗑️ Delete Clone</button>
+          <button class="studio-btn danger" id="btn-delete-target" style="margin-top: 5px;" title="Delete selected object (main building, main mountains, or clone)">🗑️ Delete Target Object</button>
           <div id="duplicate-status" class="duplicate-status"></div>
         </div>
 
