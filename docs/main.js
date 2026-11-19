@@ -418,10 +418,87 @@ if (btnDay) {
 // Initial brightness setup (85% daylight)
 setBrightnessLevel(85);
 
-// 11. Animation Loop
+// 11. Sky & Cloud Rotation Controller (Speed & 3D Direction)
+let skyRotationSpeed = 0.0006; // Default gentle natural cloud drift
+let currentSkyDirection = 'E_W';
+const skyQuat = new THREE.Quaternion();
+const deltaQuat = new THREE.Quaternion();
+
+// 3D Rotation Axes for natural compass trajectories:
+// E_W: standard earth horizon rotation around Y
+// W_E: reverse horizon rotation
+// N_S & S_N: vertical meridian horizon drift
+// NE_SW & NW_SE: diagonal sweeping cloud flows
+const directionAxes = {
+  E_W: new THREE.Vector3(0, 1, 0),
+  W_E: new THREE.Vector3(0, -1, 0),
+  N_S: new THREE.Vector3(1, 0, 0),
+  S_N: new THREE.Vector3(-1, 0, 0),
+  NE_SW: new THREE.Vector3(0.7071, 0.7071, 0).normalize(),
+  NW_SE: new THREE.Vector3(-0.7071, 0.7071, 0).normalize(),
+};
+
+const skySpeedSlider = document.getElementById('sky-speed-slider');
+const btnPauseSky = document.getElementById('btn-pause-sky');
+const btnFastSky = document.getElementById('btn-fast-sky');
+
+function updateSkySpeed(val) {
+  // 0 -> paused, 25 -> 0.0006 (gentle drift), 100 -> 0.0035 (fast time-lapse)
+  const v = Math.max(0, Math.min(100, Number(val)));
+  skyRotationSpeed = (v / 100) * 0.0035;
+}
+
+if (skySpeedSlider) {
+  skySpeedSlider.addEventListener('input', (e) => {
+    updateSkySpeed(e.target.value);
+  });
+}
+
+if (btnPauseSky) {
+  btnPauseSky.addEventListener('click', () => {
+    if (skySpeedSlider) skySpeedSlider.value = 0;
+    updateSkySpeed(0);
+  });
+}
+
+if (btnFastSky) {
+  btnFastSky.addEventListener('click', () => {
+    if (skySpeedSlider) skySpeedSlider.value = 100;
+    updateSkySpeed(100);
+  });
+}
+
+// Direction selector buttons
+const dirButtons = document.querySelectorAll('.dir-btn');
+dirButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    dirButtons.forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentSkyDirection = btn.dataset.dir || 'E_W';
+  });
+});
+
+// 12. Animation Loop with Dynamic Sky & Reflection Movement
+let frameCount = 0;
 function animate() {
   requestAnimationFrame(animate);
   controls.update();
+
+  // Smoothly rotate the sky dome & reflections if speed > 0
+  if (skyRotationSpeed > 0 && scene.background) {
+    const axis = directionAxes[currentSkyDirection] || directionAxes.E_W;
+    deltaQuat.setFromAxisAngle(axis, skyRotationSpeed);
+    skyQuat.multiply(deltaQuat);
+
+    frameCount++;
+    if (frameCount % 600 === 0) {
+      skyQuat.normalize();
+    }
+
+    scene.backgroundRotation.setFromQuaternion(skyQuat);
+    scene.environmentRotation.copy(scene.backgroundRotation);
+  }
+
   renderer.render(scene, camera);
 }
 

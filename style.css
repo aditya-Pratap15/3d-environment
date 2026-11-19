@@ -127,81 +127,134 @@ html, body {
   color: #f1f5f9;
 }
 
-/* Top Right Day-to-Night Brightness Slider Control */
-.brightness-control {
+/* Top Right Combined Controls Card (Brightness + Sky Movement) */
+.top-controls-card {
   position: fixed;
   top: 18px;
   right: 18px;
   z-index: 30;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
-  padding: 8px 14px;
-  background: rgba(15, 23, 42, 0.65);
+  padding: 12px 14px;
+  background: rgba(15, 23, 42, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
+  border-radius: 18px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.5), 0 0 20px rgba(56, 189, 248, 0.08);
+  width: 220px;
+  box-sizing: border-box;
 }
 
-.brightness-icon {
+.control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ctrl-icon {
   font-size: 15px;
   line-height: 1;
   user-select: none;
   cursor: pointer;
   opacity: 0.85;
   transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  flex-shrink: 0;
 }
 
-.brightness-icon:hover {
+.ctrl-icon:hover {
   opacity: 1;
-  transform: scale(1.2);
+  transform: scale(1.22);
 }
 
-#brightness-slider {
+.styled-slider {
   -webkit-appearance: none;
   appearance: none;
-  width: 120px;
+  flex: 1;
   height: 6px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #1e1b4b 0%, #3b82f6 45%, #f59e0b 80%, #fef08a 100%);
   outline: none;
   cursor: pointer;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
-#brightness-slider::-webkit-slider-thumb {
+.styled-slider.brightness-slider {
+  background: linear-gradient(90deg, #1e1b4b 0%, #3b82f6 45%, #f59e0b 80%, #fef08a 100%);
+}
+
+.styled-slider.speed-slider {
+  background: linear-gradient(90deg, #334155 0%, #0284c7 45%, #38bdf8 75%, #a5f3fc 100%);
+}
+
+.styled-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   background: #ffffff;
   border: 2px solid #38bdf8;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), 0 0 8px rgba(56, 189, 248, 0.6);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 6px rgba(56, 189, 248, 0.6);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-#brightness-slider::-webkit-slider-thumb:hover {
+.styled-slider::-webkit-slider-thumb:hover {
   transform: scale(1.25);
-  box-shadow: 0 2px 12px rgba(56, 189, 248, 0.9);
+  box-shadow: 0 2px 10px rgba(56, 189, 248, 0.9);
 }
 
-#brightness-slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+.styled-slider::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   background: #ffffff;
   border: 2px solid #38bdf8;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
   transition: transform 0.15s ease;
 }
 
-#brightness-slider::-moz-range-thumb:hover {
+.styled-slider::-moz-range-thumb:hover {
   transform: scale(1.25);
+}
+
+/* Direction Pills (2x3 Grid) */
+.direction-pills {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.dir-btn {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 5px 2px;
+  text-align: center;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.dir-btn:hover {
+  color: #f8fafc;
+  background: rgba(51, 65, 85, 0.85);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.dir-btn.active {
+  color: #ffffff;
+  background: rgba(56, 189, 248, 0.28);
+  border-color: #38bdf8;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.45);
 }
 
 /* Minimal Mini Square Ground Boxes (Right Center) */

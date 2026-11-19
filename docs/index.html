@@ -15,8 +15,8 @@
       }
     }
     </script>
-    <script type="module" crossorigin src="./assets/index-CwOej0Zi.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-Dmy2747J.css">
+    <script type="module" crossorigin src="./assets/index-iTUnyIKo.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DPsgjGro.css">
   </head>
   <body>
     <!-- Fullscreen 3D Canvas -->
@@ -43,18 +43,47 @@
       <span><strong>Scroll:</strong> Zoom</span>
     </div>
 
-    <!-- Top Right Day-to-Night Brightness Slider -->
-    <div class="brightness-control" id="brightness-control">
-      <span class="brightness-icon moon-icon" id="btn-night" title="Night">🌙</span>
-      <input
-        type="range"
-        id="brightness-slider"
-        min="0"
-        max="100"
-        value="85"
-        aria-label="Brightness Level Day to Night"
-      />
-      <span class="brightness-icon sun-icon" id="btn-day" title="Day">☀️</span>
+    <!-- Top Right Combined Controls Card (Brightness + Sky Movement) -->
+    <div class="top-controls-card" id="top-controls-card">
+      <!-- 1. Day to Night Brightness -->
+      <div class="control-row">
+        <span class="ctrl-icon moon-icon" id="btn-night" title="Night">🌙</span>
+        <input
+          type="range"
+          id="brightness-slider"
+          class="styled-slider brightness-slider"
+          min="0"
+          max="100"
+          value="85"
+          aria-label="Brightness Level Day to Night"
+        />
+        <span class="ctrl-icon sun-icon" id="btn-day" title="Day">☀️</span>
+      </div>
+
+      <!-- 2. Sky Cloud Rotation Speed -->
+      <div class="control-row">
+        <span class="ctrl-icon" id="btn-pause-sky" title="Pause Sky">⏸️</span>
+        <input
+          type="range"
+          id="sky-speed-slider"
+          class="styled-slider speed-slider"
+          min="0"
+          max="100"
+          value="25"
+          aria-label="Sky Cloud Speed"
+        />
+        <span class="ctrl-icon" id="btn-fast-sky" title="Fast Clouds">💨</span>
+      </div>
+
+      <!-- 3. Sky Rotation Direction Pills -->
+      <div class="direction-pills" id="sky-direction-picker">
+        <button class="dir-btn active" data-dir="E_W" title="East to West">E → W</button>
+        <button class="dir-btn" data-dir="W_E" title="West to East">W → E</button>
+        <button class="dir-btn" data-dir="N_S" title="North to South">N → S</button>
+        <button class="dir-btn" data-dir="S_N" title="South to North">S → N</button>
+        <button class="dir-btn" data-dir="NE_SW" title="Northeast to Southwest">NE ↙</button>
+        <button class="dir-btn" data-dir="NW_SE" title="Northwest to Southeast">NW ↘</button>
+      </div>
     </div>
 
     <!-- Minimal Ground Switcher Column (Right Center) -->
