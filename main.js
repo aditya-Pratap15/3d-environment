@@ -1708,9 +1708,7 @@ if (studioToggleBtn && studioPanel) {
 
   if (studioHeader) {
     studioHeader.addEventListener('click', () => {
-      if (studioPanel.classList.contains('collapsed')) {
-        togglePanel();
-      }
+      togglePanel();
     });
   }
 }
@@ -1733,9 +1731,7 @@ if (topControlsToggleBtn && topControlsCard) {
 
   if (topControlsHeader) {
     topControlsHeader.addEventListener('click', () => {
-      if (topControlsCard.classList.contains('collapsed')) {
-        toggleTopCard();
-      }
+      toggleTopCard();
     });
   }
 }
@@ -2109,9 +2105,7 @@ if (directorToggleBtn && cameraDirectorPanel) {
 
   if (cameraDirectorHeader) {
     cameraDirectorHeader.addEventListener('click', () => {
-      if (cameraDirectorPanel.classList.contains('collapsed')) {
-        toggleDirector();
-      }
+      toggleDirector();
     });
   }
 }
@@ -2937,9 +2931,7 @@ if (imageStudioToggleBtn && imageStudioPanel) {
 
   if (imageStudioHeader) {
     imageStudioHeader.addEventListener('click', () => {
-      if (imageStudioPanel.classList.contains('collapsed')) {
-        toggleImageStudio();
-      }
+      toggleImageStudio();
     });
   }
 }
