@@ -2160,10 +2160,16 @@ function getSelectedImage3D() {
 // Alpha contour tracing for background-removed PNG cutouts
 function traceAlphaContour(img, targetWidth, targetHeight) {
   try {
-    const maxDim = 100;
-    const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
-    const w = Math.max(16, Math.round(img.naturalWidth * scale));
-    const h = Math.max(16, Math.round(img.naturalHeight * scale));
+    const maxDim = 250;
+    const aspect = img.naturalWidth / img.naturalHeight;
+    let w, h;
+    if (aspect >= 1) {
+      w = Math.min(maxDim, img.naturalWidth);
+      h = Math.max(16, Math.round(w / aspect));
+    } else {
+      h = Math.min(maxDim, img.naturalHeight);
+      w = Math.max(16, Math.round(h * aspect));
+    }
 
     const canvas = document.createElement('canvas');
     canvas.width = w;
@@ -2172,11 +2178,13 @@ function traceAlphaContour(img, targetWidth, targetHeight) {
     ctx.drawImage(img, 0, 0, w, h);
     const data = ctx.getImageData(0, 0, w, h).data;
 
+    // Solid test: only consider pixels with alpha > 110 (avoids faint edge fringes & compression noise)
     const isSolid = (x, y) => {
       if (x < 0 || x >= w || y < 0 || y >= h) return false;
-      return data[(y * w + x) * 4 + 3] > 30;
+      return data[(y * w + x) * 4 + 3] > 110;
     };
 
+    // Find the first solid pixel (top to bottom, left to right)
     let startX = -1, startY = -1;
     for (let y = 0; y < h && startX === -1; y++) {
       for (let x = 0; x < w; x++) {
@@ -2190,7 +2198,7 @@ function traceAlphaContour(img, targetWidth, targetHeight) {
 
     if (startX === -1) return null;
 
-    const points = [];
+    // 8-way Moore-Neighbor tracing
     const directions = [
       { dx: 1, dy: 0 }, { dx: 1, dy: 1 }, { dx: 0, dy: 1 }, { dx: -1, dy: 1 },
       { dx: -1, dy: 0 }, { dx: -1, dy: -1 }, { dx: 0, dy: -1 }, { dx: 1, dy: -1 },
@@ -2198,14 +2206,12 @@ function traceAlphaContour(img, targetWidth, targetHeight) {
 
     let cx = startX, cy = startY;
     let dir = 7;
-    const maxSteps = 800;
+    const rawPixels = [];
+    const maxSteps = w * h;
     let steps = 0;
 
     do {
-      const nx = ((cx / w) - 0.5) * targetWidth;
-      const ny = (0.5 - (cy / h)) * targetHeight;
-      points.push(new THREE.Vector2(nx, ny));
-
+      rawPixels.push({ x: cx, y: cy });
       let found = false;
       for (let i = 0; i < 8; i++) {
         const nd = (dir + i) % 8;
@@ -2223,23 +2229,236 @@ function traceAlphaContour(img, targetWidth, targetHeight) {
       steps++;
     } while ((cx !== startX || cy !== startY) && steps < maxSteps);
 
-    if (points.length < 4) return null;
+    if (rawPixels.length < 8) return null;
 
-    const simplified = [];
-    const minDistanceSq = Math.pow(Math.min(targetWidth, targetHeight) * 0.025, 2);
-    let lastPt = points[0];
-    simplified.push(lastPt);
+    // Downsample points that are at least 1.8 pixels apart
+    const sampled = [];
+    let last = rawPixels[0];
+    sampled.push(last);
+    for (let i = 1; i < rawPixels.length; i++) {
+      const p = rawPixels[i];
+      const dx = p.x - last.x;
+      const dy = p.y - last.y;
+      if (dx * dx + dy * dy >= 3.0) {
+        sampled.push(p);
+        last = p;
+      }
+    }
+    if (sampled.length < 6) return null;
 
-    for (let i = 1; i < points.length; i++) {
-      const pt = points[i];
-      if (pt.distanceToSquared(lastPt) >= minDistanceSq) {
-        simplified.push(pt);
-        lastPt = pt;
+    // Convert pixel coordinates (0..w, 0..h) to 3D centered shape coordinates
+    const pts = sampled.map((p) => ({
+      x: ((p.x + 0.5) / w - 0.5) * targetWidth,
+      y: (0.5 - (p.y + 0.5) / h) * targetHeight,
+    }));
+
+    // Calculate signed area to verify winding
+    let signedArea = 0;
+    const n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      signedArea += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+    }
+    const isClockwise = signedArea < 0;
+
+    // INSETTING: shift boundary inward along edge normals by ~1.4%
+    // This ensures the 3D depth mesh is strictly inside the 2D image silhouette
+    const insetDist = Math.min(targetWidth, targetHeight) * 0.014;
+    const insetPts = [];
+    for (let i = 0; i < n; i++) {
+      const prev = pts[(i - 1 + n) % n];
+      const curr = pts[i];
+      const next = pts[(i + 1) % n];
+
+      let e1x = curr.x - prev.x, e1y = curr.y - prev.y;
+      const l1 = Math.hypot(e1x, e1y) || 1;
+      e1x /= l1; e1y /= l1;
+
+      let e2x = next.x - curr.x, e2y = next.y - curr.y;
+      const l2 = Math.hypot(e2x, e2y) || 1;
+      e2x /= l2; e2y /= l2;
+
+      // Inward normal for each edge
+      const n1x = isClockwise ? e1y : -e1y;
+      const n1y = isClockwise ? -e1x : e1x;
+      const n2x = isClockwise ? e2y : -e2y;
+      const n2y = isClockwise ? -e2x : e2x;
+
+      let bnx = n1x + n2x, bny = n1y + n2y;
+      const bl = Math.hypot(bnx, bny);
+      if (bl > 0.001) {
+        bnx /= bl;
+        bny /= bl;
+        const dot = n1x * n2x + n1y * n2y;
+        const scale = dot < 0 ? Math.max(0.3, 1 + dot) : 1.0;
+        insetPts.push({
+          x: curr.x + bnx * insetDist * scale,
+          y: curr.y + bny * insetDist * scale,
+        });
+      } else {
+        insetPts.push({ x: curr.x, y: curr.y });
       }
     }
 
-    if (simplified.length < 3) return null;
-    return new THREE.Shape(simplified);
+    // 2-pass Chaikin smoothing for silky-smooth organic borders
+    let smoothPts = insetPts;
+    for (let pass = 0; pass < 2; pass++) {
+      const nextPass = [];
+      const len = smoothPts.length;
+      for (let i = 0; i < len; i++) {
+        const p0 = smoothPts[i];
+        const p1 = smoothPts[(i + 1) % len];
+        nextPass.push({
+          x: 0.75 * p0.x + 0.25 * p1.x,
+          y: 0.75 * p0.y + 0.25 * p1.y,
+        });
+        nextPass.push({
+          x: 0.25 * p0.x + 0.75 * p1.x,
+          y: 0.25 * p0.y + 0.75 * p1.y,
+        });
+      }
+      smoothPts = nextPass;
+    }
+
+    const shape = new THREE.Shape();
+    shape.moveTo(smoothPts[0].x, smoothPts[0].y);
+    for (let i = 1; i < smoothPts.length; i++) {
+      shape.lineTo(smoothPts[i].x, smoothPts[i].y);
+    }
+    shape.closePath();
+
+    // INNER HOLES DETECTION (e.g. gap between legs or under arms)
+    try {
+      const bgVisited = new Uint8Array(w * h);
+      const queue = [];
+      for (let x = 0; x < w; x++) {
+        if (!isSolid(x, 0)) { bgVisited[x] = 1; queue.push(x, 0); }
+        if (!isSolid(x, h - 1)) { bgVisited[(h - 1) * w + x] = 1; queue.push(x, h - 1); }
+      }
+      for (let y = 1; y < h - 1; y++) {
+        if (!isSolid(0, y)) { bgVisited[y * w] = 1; queue.push(0, y); }
+        if (!isSolid(w - 1, y)) { bgVisited[y * w + (w - 1)] = 1; queue.push(w - 1, y); }
+      }
+
+      let qHead = 0;
+      while (qHead < queue.length) {
+        const qx = queue[qHead++];
+        const qy = queue[qHead++];
+        const nbrs = [qx + 1, qy, qx - 1, qy, qx, qy + 1, qx, qy - 1];
+        for (let k = 0; k < 8; k += 2) {
+          const nx = nbrs[k], ny = nbrs[k + 1];
+          if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+            const idx = ny * w + nx;
+            if (!bgVisited[idx] && !isSolid(nx, ny)) {
+              bgVisited[idx] = 1;
+              queue.push(nx, ny);
+            }
+          }
+        }
+      }
+
+      const holeVisited = new Uint8Array(w * h);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const idx = y * w + x;
+          if (!isSolid(x, y) && !bgVisited[idx] && !holeVisited[idx]) {
+            const hQueue = [x, y];
+            holeVisited[idx] = 1;
+            const holePix = [];
+            let hHead = 0;
+            while (hHead < hQueue.length) {
+              const hx = hQueue[hHead++];
+              const hy = hQueue[hHead++];
+              holePix.push({ x: hx, y: hy });
+              const hn = [hx + 1, hy, hx - 1, hy, hx, hy + 1, hx, hy - 1];
+              for (let k = 0; k < 8; k += 2) {
+                const nx = hn[k], ny = hn[k + 1];
+                if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                  const nIdx = ny * w + nx;
+                  if (!isSolid(nx, ny) && !bgVisited[nIdx] && !holeVisited[nIdx]) {
+                    holeVisited[nIdx] = 1;
+                    hQueue.push(nx, ny);
+                  }
+                }
+              }
+            }
+
+            // Only cutout noticeable interior holes (> 25 pixels)
+            if (holePix.length >= 25) {
+              const hStartX = holePix[0].x, hStartY = holePix[0].y;
+              const isHole = (hx, hy) => hx >= 0 && hx < w && hy >= 0 && hy < h && holeVisited[hy * w + hx] === 1;
+
+              let hcx = hStartX, hcy = hStartY, hdir = 7;
+              const hRaw = [];
+              let hSteps = 0;
+              do {
+                hRaw.push({ x: hcx, y: hcy });
+                let hFound = false;
+                for (let i = 0; i < 8; i++) {
+                  const nd = (hdir + i) % 8;
+                  const nhx = hcx + directions[nd].dx;
+                  const nhy = hcy + directions[nd].dy;
+                  if (isHole(nhx, nhy)) {
+                    hcx = nhx;
+                    hcy = nhy;
+                    hdir = (nd + 5) % 8;
+                    hFound = true;
+                    break;
+                  }
+                }
+                if (!hFound) break;
+                hSteps++;
+              } while ((hcx !== hStartX || hcy !== hStartY) && hSteps < maxSteps);
+
+              if (hRaw.length >= 8) {
+                const hSampled = [];
+                let hLast = hRaw[0];
+                hSampled.push(hLast);
+                for (let i = 1; i < hRaw.length; i++) {
+                  const p = hRaw[i];
+                  const dx = p.x - hLast.x, dy = p.y - hLast.y;
+                  if (dx * dx + dy * dy >= 3.0) {
+                    hSampled.push(p);
+                    hLast = p;
+                  }
+                }
+
+                if (hSampled.length >= 4) {
+                  let hPts = hSampled.map((p) => ({
+                    x: ((p.x + 0.5) / w - 0.5) * targetWidth,
+                    y: (0.5 - (p.y + 0.5) / h) * targetHeight,
+                  }));
+
+                  // Chaikin smooth hole
+                  for (let pass = 0; pass < 2; pass++) {
+                    const nextPass = [];
+                    const hLen = hPts.length;
+                    for (let i = 0; i < hLen; i++) {
+                      const p0 = hPts[i], p1 = hPts[(i + 1) % hLen];
+                      nextPass.push({ x: 0.75 * p0.x + 0.25 * p1.x, y: 0.75 * p0.y + 0.25 * p1.y });
+                      nextPass.push({ x: 0.25 * p0.x + 0.75 * p1.x, y: 0.25 * p0.y + 0.75 * p1.y });
+                    }
+                    hPts = nextPass;
+                  }
+
+                  const holePath = new THREE.Path();
+                  holePath.moveTo(hPts[0].x, hPts[0].y);
+                  for (let i = 1; i < hPts.length; i++) {
+                    holePath.lineTo(hPts[i].x, hPts[i].y);
+                  }
+                  holePath.closePath();
+                  shape.holes.push(holePath);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (holeErr) {
+      console.warn('Hole detection fallback:', holeErr);
+    }
+
+    return shape;
   } catch (err) {
     console.warn('Contour tracing fallback:', err);
     return null;
@@ -2262,109 +2481,156 @@ function buildImageGeometryAndMaterials(imgObj) {
     imgObj.sideTexture.needsUpdate = true;
   }
 
-  // Transparency level: 100% = Hard Opaque Solid (opacity 1.0), 0% = Complete Transparent (opacity 0.0)
-  const alphaOpacity = Math.max(0, Math.min(100, Number(transparency ?? 100))) / 100;
-  const isHardOpaque = alphaOpacity >= 0.99;
+  // Depth Opacity Level: 0% = completely transparent depth, 100% = hard solid opaque depth
+  const depthOpacity = Math.max(0, Math.min(100, Number(transparency ?? 100))) / 100;
+  const isDepthOpaque = depthOpacity >= 0.999;
   const glossRoughness = 1.0 - (Math.max(0, Math.min(100, Number(reflection ?? 80))) / 100) * 0.92;
 
+  // 1. FRONT MATERIAL: ALWAYS 100% OPAQUE SOLID - NEVER LOSES OPACITY!
   const frontMat = new THREE.MeshStandardMaterial({
     map: imgObj.texture,
-    transparent: !isHardOpaque || imgObj.hasAlpha,
-    alphaTest: isHardOpaque ? 0.05 : 0.001,
-    opacity: alphaOpacity,
+    transparent: imgObj.hasAlpha,
+    alphaTest: imgObj.hasAlpha ? 0.05 : 0,
+    opacity: 1.0, // Fixed at 1.0 - front image NEVER fades!
     roughness: 0.25,
     metalness: 0.05,
-    side: THREE.DoubleSide,
-    depthWrite: isHardOpaque,
+    side: THREE.FrontSide,
+    depthWrite: true,
   });
 
-  const backMat = frontMat.clone();
+  // 2. BACK MATERIAL: Used for the rear face when viewed from behind
+  const backMat = new THREE.MeshStandardMaterial({
+    map: imgObj.texture,
+    transparent: !isDepthOpaque || imgObj.hasAlpha,
+    alphaTest: imgObj.hasAlpha ? 0.05 : 0,
+    opacity: depthOpacity,
+    roughness: 0.35,
+    metalness: 0.05,
+    side: THREE.FrontSide,
+    depthWrite: depthOpacity >= 0.3,
+    visible: depthOpacity > 0.001,
+  });
 
-  // Side extruded 3D mesh material (hard solid opaque when 100% with natural image edge reflections)
+  // 3. SIDE / EXTRUDED DEPTH MATERIAL: Smooth 3D depth with natural edge reflections
   const sideMat = new THREE.MeshPhysicalMaterial({
     map: imgObj.sideTexture,
-    transparent: !isHardOpaque,
-    opacity: alphaOpacity,
+    transparent: !isDepthOpaque,
+    opacity: depthOpacity,
     roughness: glossRoughness,
     metalness: 0.15,
     reflectivity: 0.95,
     clearcoat: 1.0,
     clearcoatRoughness: 0.08,
     side: THREE.DoubleSide,
-    depthWrite: isHardOpaque,
+    depthWrite: depthOpacity >= 0.3,
+    visible: depthOpacity > 0.001,
   });
 
   imgObj.frontMat = frontMat;
   imgObj.backMat = backMat;
   imgObj.sideMat = sideMat;
 
-  let geo;
-  let materials;
+  // Clear existing child meshes from the group
+  if (imgObj.group) {
+    while (imgObj.group.children.length > 0) {
+      const child = imgObj.group.children[0];
+      if (child.geometry) child.geometry.dispose();
+      imgObj.group.remove(child);
+    }
+  }
 
   if (imgObj.hasAlpha) {
     const shape = traceAlphaContour(img, width, height);
     if (shape) {
-      geo = new THREE.ExtrudeGeometry(shape, {
+      // Extrude 3D backing mesh
+      const extrudeGeo = new THREE.ExtrudeGeometry(shape, {
         depth: Math.max(0.05, depth),
         bevelEnabled: false,
         steps: 1,
       });
+      // Center along Z only (from -depth/2 to +depth/2) - DO NOT shift X/Y!
+      extrudeGeo.translate(0, 0, -depth / 2);
 
-      const pos = geo.attributes.position;
+      const pos = extrudeGeo.attributes.position;
       const uvs = [];
       for (let i = 0; i < pos.count; i++) {
         const x = pos.getX(i);
         const y = pos.getY(i);
         uvs.push((x / width) + 0.5, (y / height) + 0.5);
       }
-      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-      geo.center();
-      materials = [frontMat, sideMat];
-    } else {
-      geo = new THREE.BoxGeometry(width, height, depth);
-      materials = [sideMat, sideMat, sideMat, sideMat, frontMat, backMat];
+      extrudeGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      extrudeGeo.computeVertexNormals();
+
+      const depthMesh = new THREE.Mesh(extrudeGeo, [sideMat, sideMat]);
+      depthMesh.castShadow = true;
+      depthMesh.receiveShadow = true;
+      imgObj.mesh = depthMesh;
+      imgObj.group.add(depthMesh);
+
+      // Layered Front Plane: 100% crisp, un-downsampled 2D photo layered at z = depth/2 + 0.005
+      // Because the 3D backing is inset inward, the front plane cleanly masks it from the front!
+      const frontGeo = new THREE.PlaneGeometry(width, height);
+      const frontMesh = new THREE.Mesh(frontGeo, frontMat);
+      frontMesh.position.set(0, 0, depth / 2 + 0.005);
+      frontMesh.castShadow = true;
+      frontMesh.receiveShadow = true;
+      imgObj.frontMesh = frontMesh;
+      imgObj.group.add(frontMesh);
+
+      // Layered Back Plane: at z = -depth/2 - 0.005 facing back
+      const backGeo = new THREE.PlaneGeometry(width, height);
+      const backMesh = new THREE.Mesh(backGeo, backMat);
+      backMesh.position.set(0, 0, -depth / 2 - 0.005);
+      backMesh.rotation.y = Math.PI;
+      backMesh.castShadow = true;
+      backMesh.receiveShadow = true;
+      imgObj.backMesh = backMesh;
+      imgObj.group.add(backMesh);
+
+      return { geometry: extrudeGeo, materials: [sideMat, sideMat] };
     }
-  } else {
-    geo = new THREE.BoxGeometry(width, height, depth);
-    materials = [sideMat, sideMat, sideMat, sideMat, frontMat, backMat];
   }
 
-  return { geometry: geo, materials: materials };
+  // Standard box fallback (for non-alpha JPG or rectangular photos)
+  const boxGeo = new THREE.BoxGeometry(width, height, depth);
+  const materials = [sideMat, sideMat, sideMat, sideMat, frontMat, backMat];
+  const boxMesh = new THREE.Mesh(boxGeo, materials);
+  boxMesh.castShadow = true;
+  boxMesh.receiveShadow = true;
+  imgObj.mesh = boxMesh;
+  imgObj.group.add(boxMesh);
+
+  return { geometry: boxGeo, materials: materials };
 }
 
 function updateSelectedImage3D(rebuildGeo = true) {
   const obj = getSelectedImage3D();
-  if (!obj || !obj.mesh) return;
+  if (!obj || !obj.group) return;
 
   if (rebuildGeo) {
-    const { geometry, materials } = buildImageGeometryAndMaterials(obj);
-    if (obj.mesh.geometry) obj.mesh.geometry.dispose();
-    obj.mesh.geometry = geometry;
-    obj.mesh.material = materials;
+    buildImageGeometryAndMaterials(obj);
   } else {
-    const alphaOpacity = Math.max(0, Math.min(100, Number(obj.transparency ?? 100))) / 100;
-    const isHardOpaque = alphaOpacity >= 0.99;
+    // Fast material update when dragging Opacity or Reflection sliders
+    const depthOpacity = Math.max(0, Math.min(100, Number(obj.transparency ?? 100))) / 100;
+    const isDepthOpaque = depthOpacity >= 0.999;
     const glossRoughness = 1.0 - (Math.max(0, Math.min(100, Number(obj.reflection ?? 80))) / 100) * 0.92;
 
     if (obj.sideMat) {
-      obj.sideMat.opacity = alphaOpacity;
-      obj.sideMat.transparent = !isHardOpaque;
-      obj.sideMat.depthWrite = isHardOpaque;
+      obj.sideMat.opacity = depthOpacity;
+      obj.sideMat.transparent = !isDepthOpaque;
+      obj.sideMat.depthWrite = depthOpacity >= 0.3;
+      obj.sideMat.visible = depthOpacity > 0.001;
       obj.sideMat.roughness = glossRoughness;
       obj.sideMat.needsUpdate = true;
     }
-    if (obj.frontMat) {
-      obj.frontMat.opacity = alphaOpacity;
-      obj.frontMat.transparent = !isHardOpaque || obj.hasAlpha;
-      obj.frontMat.depthWrite = isHardOpaque;
-      obj.frontMat.needsUpdate = true;
-    }
     if (obj.backMat) {
-      obj.backMat.opacity = alphaOpacity;
-      obj.backMat.transparent = !isHardOpaque || obj.hasAlpha;
-      obj.backMat.depthWrite = isHardOpaque;
+      obj.backMat.opacity = depthOpacity;
+      obj.backMat.transparent = !isDepthOpaque || obj.hasAlpha;
+      obj.backMat.depthWrite = depthOpacity >= 0.3;
+      obj.backMat.visible = depthOpacity > 0.001;
       obj.backMat.needsUpdate = true;
     }
+    // obj.frontMat is strictly UNTOUCHED and remains 100% solid & opaque!
   }
 
   obj.group.position.set(obj.position.x, obj.position.y, obj.position.z);
@@ -2470,12 +2736,7 @@ function createImage3DObject(img, dataUrl, fileName) {
     group: new THREE.Group(),
   };
 
-  const { geometry, materials } = buildImageGeometryAndMaterials(newObj);
-  const mesh = new THREE.Mesh(geometry, materials);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  newObj.mesh = mesh;
-  newObj.group.add(mesh);
+  buildImageGeometryAndMaterials(newObj);
 
   newObj.group.position.set(newObj.position.x, newObj.position.y, newObj.position.z);
   newObj.group.rotation.y = (newObj.rotationY * Math.PI) / 180;

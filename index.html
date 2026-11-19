@@ -320,21 +320,21 @@
             </div>
           </div>
 
-          <!-- 4. Extruded Width/Edge Style: Reflection & Transparency -->
+          <!-- 4. Extruded Depth & Thickness Style: Reflection & Opacity -->
           <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px; margin-top: 6px;">
-            <span style="font-size: 11px; font-weight: 700; color: #f8fafc;">✨ Extruded Edge Style</span>
+            <span style="font-size: 11px; font-weight: 700; color: #f8fafc;">✨ 3D Depth & Edge Style</span>
 
-            <!-- Transparency Level (100% = Hard Opaque, 0% = Complete Transparent) -->
-            <div style="font-size: 10px; color: #94a3b8; margin: 3px 0 1px 2px;">Transparency Level (100% Opaque → 0% Transparent)</div>
-            <div class="slider-row" title="100% = Hard Opaque solid 3D mesh, 0% = Completely Transparent">
-              <span class="axis-badge">🫧</span>
+            <!-- Depth Opacity Level (0% Transparent → 100% Solid Opaque) -->
+            <div style="font-size: 10px; color: #94a3b8; margin: 3px 0 1px 2px;">Depth Opacity (0% Transparent → 100% Solid Opaque)</div>
+            <div class="slider-row" title="Controls 3D thickness opacity: 0% = completely transparent depth, 100% = hard solid opaque depth. Front image always stays 100% crisp & opaque!">
+              <span class="axis-badge">🧱</span>
               <input type="range" id="img-transparency-slider" class="styled-slider studio-slider" min="0" max="100" value="100" />
               <span class="val-display" id="img-transparency-val">100%</span>
             </div>
 
             <!-- Side Reflection / Glossiness -->
             <div style="font-size: 10px; color: #94a3b8; margin: 3px 0 1px 2px;">Side Edge Reflection</div>
-            <div class="slider-row" title="Mirror reflection of the image & sky on the 3D thickness">
+            <div class="slider-row" title="Mirror reflection of the image & sky on the 3D depth edges">
               <span class="axis-badge">🪞</span>
               <input type="range" id="img-reflection-slider" class="styled-slider studio-slider" min="0" max="100" value="80" />
               <span class="val-display" id="img-reflection-val">80%</span>
