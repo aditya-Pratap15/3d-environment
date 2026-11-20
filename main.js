@@ -656,6 +656,8 @@ function animate() {
 
     camera.position.copy(tempFlightPos);
     controls.target.copy(tempFlightTarget);
+    camera.lookAt(tempFlightTarget);
+    controls.update();
   } else {
     controls.enabled = true;
     controls.update();
@@ -2152,6 +2154,10 @@ function startFlightLoop() {
   }
   rebuildSplineCurves();
   flightProgress = 0;
+  camera.position.copy(cameraWaypoints[0].position);
+  controls.target.copy(cameraWaypoints[0].target);
+  camera.lookAt(cameraWaypoints[0].target);
+  controls.update();
   isFlyingCamera = true;
   if (btnPreviewFlight) btnPreviewFlight.textContent = '⏹️ Stop Preview';
   return true;
@@ -2210,6 +2216,10 @@ function startRecording() {
   if (cameraWaypoints.length >= 2) {
     rebuildSplineCurves();
     flightProgress = 0;
+    camera.position.copy(cameraWaypoints[0].position);
+    controls.target.copy(cameraWaypoints[0].target);
+    camera.lookAt(cameraWaypoints[0].target);
+    controls.update();
     isFlyingCamera = true;
     if (btnPreviewFlight) btnPreviewFlight.textContent = '⏹️ Stop Preview';
   }
