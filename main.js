@@ -635,6 +635,9 @@ let isFlyingCamera = false;
 let activePosCurve = null;
 let activeTargetCurve = null;
 let flightProgress = 0;
+let flightDirection = 1; // 1 = forward, -1 = backward (ping-pong)
+let pathLoopCheckbox = null;
+let infiniteFlightCheckbox = null;
 const tempFlightPos = new THREE.Vector3();
 const tempFlightTarget = new THREE.Vector3();
 let cameraSpeedPercent = 35;
@@ -645,19 +648,56 @@ function animate() {
 
   const delta = flightClock.getDelta();
 
-  // Infinite Camera Flight Path loop
+  // Camera Flight Path loop
   if (isFlyingCamera && activePosCurve && activeTargetCurve) {
     controls.enabled = false;
     const rate = Math.max(0.005, (cameraSpeedPercent / 100) * 0.12);
-    flightProgress = (flightProgress + delta * rate) % 1.0;
+    const isLoop = pathLoopCheckbox ? pathLoopCheckbox.checked : true;
+    const isInfinite = infiniteFlightCheckbox ? infiniteFlightCheckbox.checked : true;
 
-    activePosCurve.getPointAt(flightProgress, tempFlightPos);
-    activeTargetCurve.getPointAt(flightProgress, tempFlightTarget);
+    if (isInfinite) {
+      if (isLoop) {
+        // Continuous circular loop
+        flightProgress = (flightProgress + delta * rate) % 1.0;
+      } else {
+        // Continuous ping-pong / yoyo: start to end and then backward
+        flightProgress += delta * rate * flightDirection;
+        if (flightDirection === 1 && flightProgress >= 1.0) {
+          flightProgress = 1.0;
+          flightDirection = -1;
+        } else if (flightDirection === -1 && flightProgress <= 0.0) {
+          flightProgress = 0.0;
+          flightDirection = 1;
+        }
+      }
+    } else {
+      // Single flight pass: start to finish and then stop
+      flightProgress += delta * rate;
+      if (flightProgress >= 1.0) {
+        flightProgress = 1.0;
+        activePosCurve.getPointAt(1.0, tempFlightPos);
+        activeTargetCurve.getPointAt(1.0, tempFlightTarget);
+        camera.position.copy(tempFlightPos);
+        controls.target.copy(tempFlightTarget);
+        camera.lookAt(tempFlightTarget);
+        controls.update();
 
-    camera.position.copy(tempFlightPos);
-    controls.target.copy(tempFlightTarget);
-    camera.lookAt(tempFlightTarget);
-    controls.update();
+        stopFlightLoop();
+        if (isRecording) {
+          stopRecording();
+        }
+      }
+    }
+
+    if (isFlyingCamera) {
+      activePosCurve.getPointAt(flightProgress, tempFlightPos);
+      activeTargetCurve.getPointAt(flightProgress, tempFlightTarget);
+
+      camera.position.copy(tempFlightPos);
+      controls.target.copy(tempFlightTarget);
+      camera.lookAt(tempFlightTarget);
+      controls.update();
+    }
   } else {
     controls.enabled = true;
     controls.update();
@@ -1977,6 +2017,8 @@ const waypointsTimeline = document.getElementById('waypoints-timeline');
 const cameraSpeedSlider = document.getElementById('camera-speed-slider');
 const cameraSpeedVal = document.getElementById('camera-speed-val');
 const showPathLineCheckbox = document.getElementById('show-path-line-checkbox');
+pathLoopCheckbox = document.getElementById('path-loop-checkbox');
+infiniteFlightCheckbox = document.getElementById('infinite-flight-checkbox');
 
 const btnPreviewFlight = document.getElementById('btn-preview-flight');
 const btnRecordVideo = document.getElementById('btn-record-video');
@@ -1996,9 +2038,9 @@ function rebuildSplineCurves() {
   const posPoints = cameraWaypoints.map((w) => w.position);
   const targetPoints = cameraWaypoints.map((w) => w.target);
 
-  // Closed loop: smoothly continuous from last point back into first point
-  activePosCurve = new THREE.CatmullRomCurve3(posPoints, true, 'catmullrom', 0.5);
-  activeTargetCurve = new THREE.CatmullRomCurve3(targetPoints, true, 'catmullrom', 0.5);
+  const isLoop = pathLoopCheckbox ? pathLoopCheckbox.checked : true;
+  activePosCurve = new THREE.CatmullRomCurve3(posPoints, isLoop, 'catmullrom', 0.5);
+  activeTargetCurve = new THREE.CatmullRomCurve3(targetPoints, isLoop, 'catmullrom', 0.5);
 }
 
 function updateWaypointsUI() {
@@ -2054,8 +2096,9 @@ function updatePathVisual() {
   const showLine = showPathLineCheckbox ? showPathLineCheckbox.checked : true;
   if (!showLine || cameraWaypoints.length < 2) return;
 
+  const isLoop = pathLoopCheckbox ? pathLoopCheckbox.checked : true;
   const points = cameraWaypoints.map((w) => w.position);
-  const curve = new THREE.CatmullRomCurve3(points, true, 'catmullrom', 0.5);
+  const curve = new THREE.CatmullRomCurve3(points, isLoop, 'catmullrom', 0.5);
   const curvePoints = curve.getPoints(120);
 
   const lineGeom = new THREE.BufferGeometry().setFromPoints(curvePoints);
@@ -2138,6 +2181,13 @@ if (showPathLineCheckbox) {
   });
 }
 
+if (pathLoopCheckbox) {
+  pathLoopCheckbox.addEventListener('change', () => {
+    rebuildSplineCurves();
+    updatePathVisual();
+  });
+}
+
 if (btnAddKeyframe) {
   btnAddKeyframe.addEventListener('click', addCurrentWaypoint);
 }
@@ -2154,6 +2204,7 @@ function startFlightLoop() {
   }
   rebuildSplineCurves();
   flightProgress = 0;
+  flightDirection = 1;
   camera.position.copy(cameraWaypoints[0].position);
   controls.target.copy(cameraWaypoints[0].target);
   camera.lookAt(cameraWaypoints[0].target);
@@ -2212,10 +2263,11 @@ function startRecording() {
     return;
   }
 
-  // If we have at least 2 waypoints, start continuous camera loop flight immediately!
+  // If we have at least 2 waypoints, start camera flight immediately!
   if (cameraWaypoints.length >= 2) {
     rebuildSplineCurves();
     flightProgress = 0;
+    flightDirection = 1;
     camera.position.copy(cameraWaypoints[0].position);
     controls.target.copy(cameraWaypoints[0].target);
     camera.lookAt(cameraWaypoints[0].target);
@@ -2291,9 +2343,13 @@ function startRecording() {
     btnRecordVideo.classList.add('recording');
   }
 
+  const isLoop = pathLoopCheckbox ? pathLoopCheckbox.checked : true;
+  const isInfinite = infiniteFlightCheckbox ? infiniteFlightCheckbox.checked : true;
+  const modeLabel = isInfinite ? (isLoop ? 'Loop' : 'Ping-Pong') : 'Single Pass';
+
   if (directorStatus) {
     directorStatus.className = 'director-status recording-active';
-    directorStatus.textContent = 'REC 00:00 (Looping)';
+    directorStatus.textContent = `REC 00:00 (${modeLabel})`;
   }
 
   recordingTimer = setInterval(() => {
@@ -2301,7 +2357,7 @@ function startRecording() {
     const mm = String(Math.floor(sec / 60)).padStart(2, '0');
     const ss = String(sec % 60).padStart(2, '0');
     if (directorStatus && isRecording) {
-      directorStatus.textContent = `REC ${mm}:${ss} (60fps)`;
+      directorStatus.textContent = `REC ${mm}:${ss} (${modeLabel})`;
     }
   }, 500);
 }

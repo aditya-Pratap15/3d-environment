@@ -382,18 +382,27 @@
           </div>
         </div>
 
-        <!-- Flight Settings: Camera Speed Slider & View Toggle -->
+        <!-- Flight Settings: Camera Speed Slider, Loop Formation & Infinite Flight Toggles -->
         <div class="director-section">
           <div class="slider-row" style="margin-bottom: 6px;">
             <span class="director-sublabel">🚀 Camera Speed:</span>
             <input type="range" id="camera-speed-slider" class="styled-slider director-slider" min="1" max="100" value="35" />
             <span class="val-display" id="camera-speed-val">35%</span>
           </div>
-          <div class="director-options-row">
-            <span style="font-size: 10px; color: #94a3b8;">🔁 Infinite Loop Flight</span>
-            <label class="director-checkbox-label">
+          <div class="director-options-row" style="margin-top: 4px;">
+            <label class="director-checkbox-label" title="Form a closed loop connecting end point back to start point. When unchecked, path is open and camera moves back-and-forth.">
+              <input type="checkbox" id="path-loop-checkbox" checked />
+              <span>🔄 Loop Formation</span>
+            </label>
+            <label class="director-checkbox-label" title="Flight repeats continuously. When unchecked, camera takes only a single flight pass from start to finish.">
+              <input type="checkbox" id="infinite-flight-checkbox" checked />
+              <span>🔁 Infinite Flight</span>
+            </label>
+          </div>
+          <div class="director-options-row" style="margin-top: 5px; justify-content: flex-end;">
+            <label class="director-checkbox-label" title="Show or hide the 3D path curve in the viewport">
               <input type="checkbox" id="show-path-line-checkbox" checked />
-              <span>👁️ 3D Path</span>
+              <span>👁️ 3D Path Line</span>
             </label>
           </div>
         </div>
