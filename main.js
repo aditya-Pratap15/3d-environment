@@ -2801,17 +2801,8 @@ function buildImageGeometryAndMaterials(imgObj) {
       frontMesh.castShadow = true;
       frontMesh.receiveShadow = true;
       imgObj.frontMesh = frontMesh;
+      imgObj.backMesh = null;
       imgObj.group.add(frontMesh);
-
-      // Layered Back Plane: at z = -depth/2 - 0.005 facing back
-      const backGeo = new THREE.PlaneGeometry(width, height);
-      const backMesh = new THREE.Mesh(backGeo, backMat);
-      backMesh.position.set(0, 0, -depth / 2 - 0.005);
-      backMesh.rotation.y = Math.PI;
-      backMesh.castShadow = true;
-      backMesh.receiveShadow = true;
-      imgObj.backMesh = backMesh;
-      imgObj.group.add(backMesh);
 
       return { geometry: extrudeGeo, materials: [sideMat, sideMat] };
     }
