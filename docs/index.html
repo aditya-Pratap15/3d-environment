@@ -18,8 +18,8 @@
       }
     }
     </script>
-    <script type="module" crossorigin src="./assets/index-DtZ_p70q.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BX1UHRn4.css">
+    <script type="module" crossorigin src="./assets/index-BdXPBTon.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Wteqrcmx.css">
   </head>
   <body>
     <!-- Fullscreen 3D Canvas -->
@@ -46,25 +46,20 @@
       <span><strong>Scroll:</strong> Zoom</span>
     </div>
 
-    <!-- Top Left Studio Settings & Transform Panel -->
-    <div class="studio-panel collapsed" id="studio-panel">
-      <!-- Header with Toggle Button -->
-      <div class="studio-header" id="studio-header">
-        <div class="studio-title">
-          <span>⚙️</span>
-          <span>Studio Controls</span>
-        </div>
-        <button class="studio-toggle-btn" id="studio-toggle-btn" title="Toggle Controls" aria-label="Toggle Studio Controls">⚙️</button>
-      </div>
-
-      <div class="studio-body" id="studio-body">
-        <!-- Universal Undo / Redo Actions -->
-        <div class="studio-section" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px;">
-          <div class="action-btn-group">
-            <button class="studio-btn history-btn" id="btn-undo" title="Undo last action (Ctrl+Z)" disabled>↩️ Undo</button>
-            <button class="studio-btn history-btn" id="btn-redo" title="Redo action (Ctrl+Y)" disabled>↪️ Redo</button>
+    <!-- Top Left Bar: Studio Settings & Floating Universal Undo / Redo -->
+    <div class="top-left-bar" id="top-left-bar">
+      <!-- Top Left Studio Settings & Transform Panel -->
+      <div class="studio-panel collapsed" id="studio-panel">
+        <!-- Header with Toggle Button -->
+        <div class="studio-header" id="studio-header">
+          <div class="studio-title">
+            <span>⚙️</span>
+            <span>Studio Controls</span>
           </div>
+          <button class="studio-toggle-btn" id="studio-toggle-btn" title="Toggle Controls" aria-label="Toggle Studio Controls">⚙️</button>
         </div>
+
+        <div class="studio-body" id="studio-body">
 
         <!-- Presets & Saved Scenes Section -->
         <div class="studio-section">
@@ -197,6 +192,20 @@
         </div>
       </div>
     </div>
+
+    <!-- Floating Universal Undo & Redo Bar (Outside on Right Side of Studio Controls Box) -->
+    <div class="history-floating-bar" id="history-floating-bar" title="Universal History Controls">
+      <button class="history-pill-btn" id="btn-undo" title="Universal Undo (Ctrl+Z)" disabled>
+        <span class="history-icon">↩️</span>
+        <span class="history-label">Undo</span>
+      </button>
+      <button class="history-pill-btn" id="btn-redo" title="Universal Redo (Ctrl+Y)" disabled>
+        <span class="history-icon">↪️</span>
+        <span class="history-label">Redo</span>
+      </button>
+      <div id="history-toast" class="history-toast"></div>
+    </div>
+  </div>
 
     <!-- Top 3D Cuboid Studio Panel (Left Side of Record Box) -->
     <div class="cuboid-studio-panel collapsed" id="cuboid-studio-panel">

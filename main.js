@@ -988,6 +988,20 @@ if (shadowDarknessSlider) {
 // =====================================================================
 // --- Universal Undo / Redo History Stack ---
 // =====================================================================
+// --- Universal Registries & History Stack (Universal Undo / Redo) ---
+// =====================================================================
+let image3dRegistry = [];
+let selectedImageId = null;
+let imageCountIndex = 0;
+const deletedImagesCache = new Map();
+
+let cuboid3dRegistry = [];
+let selectedCuboidId = null;
+let cuboidCountIndex = 0;
+const deletedCuboidsCache = new Map();
+
+let isRestoringHistory = false;
+
 const undoStack = [];
 const redoStack = [];
 const MAX_UNDO = 50;
@@ -998,6 +1012,18 @@ function updateHistoryButtons() {
   }
   if (btnRedo) {
     btnRedo.disabled = redoStack.length === 0;
+  }
+}
+
+function showHistoryToast(msg) {
+  const toast = document.getElementById('history-toast');
+  if (toast) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => {
+      toast.classList.remove('show');
+    }, 1800);
   }
 }
 
@@ -1012,6 +1038,34 @@ function captureSnapshot() {
       offset: { x: o.offset.x, y: o.offset.y, z: o.offset.z, rotY: o.offset.rotY },
     })),
     selectedObjectId: selectedObjectId,
+    images3d: image3dRegistry.map((img) => ({
+      id: img.id,
+      name: img.name,
+      dataUrl: img.dataUrl,
+      hasAlpha: img.hasAlpha,
+      aspect: img.aspect,
+      width: img.width,
+      height: img.height,
+      depth: img.depth,
+      transparency: img.transparency,
+      reflection: img.reflection,
+      position: { x: img.position.x, y: img.position.y, z: img.position.z },
+      rotationY: img.rotationY,
+    })),
+    selectedImageId: selectedImageId,
+    cuboids3d: cuboid3dRegistry.map((c) => ({
+      id: c.id,
+      name: c.name,
+      width: c.width,
+      height: c.height,
+      depth: c.depth,
+      smoothness: c.smoothness,
+      color: c.color,
+      textureDataUrl: c.textureDataUrl || null,
+      position: { x: c.position.x, y: c.position.y, z: c.position.z },
+      rotation: { x: c.rotation.x, y: c.rotation.y, z: c.rotation.z },
+    })),
+    selectedCuboidId: selectedCuboidId,
     groundType: currentGroundType,
     mountainStyle: mountainStyleSelect ? mountainStyleSelect.value : 'natural',
     brightness: brightnessSlider ? Number(brightnessSlider.value) : 57,
@@ -1025,6 +1079,7 @@ function captureSnapshot() {
 }
 
 function pushHistoryState(explicitSnapshot = null) {
+  if (isRestoringHistory) return;
   const snap = explicitSnapshot || captureSnapshot();
   undoStack.push(snap);
   if (undoStack.length > MAX_UNDO) {
@@ -1036,108 +1091,274 @@ function pushHistoryState(explicitSnapshot = null) {
 
 function restoreSnapshot(snap) {
   if (!snap) return;
+  isRestoringHistory = true;
 
-  // 1. Remove all current clones from scene
-  objectsRegistry.forEach((o) => {
-    if (o.isClone) {
-      scene.remove(o.group);
-    }
-  });
+  try {
+    // 1. Remove all current clones from scene
+    objectsRegistry.forEach((o) => {
+      if (o.isClone) {
+        scene.remove(o.group);
+      }
+    });
 
-  // Ensure base groups are present or removed according to snapshot
-  const hasBaseBuildings = snap.objects.some((o) => !o.isClone && o.type === 'buildings');
-  if (hasBaseBuildings) {
-    if (!scene.children.includes(buildingsGroup)) scene.add(buildingsGroup);
-  } else {
-    scene.remove(buildingsGroup);
-  }
-
-  const hasBaseMountains = snap.objects.some((o) => !o.isClone && o.type === 'mountains');
-  if (hasBaseMountains) {
-    if (!scene.children.includes(mountainGroup)) scene.add(mountainGroup);
-  } else {
-    scene.remove(mountainGroup);
-  }
-
-  // 2. Reconstruct objectsRegistry
-  const newRegistry = [];
-
-  snap.objects.forEach((objData) => {
-    let grp;
-    const basePos = new THREE.Vector3(objData.basePos.x, objData.basePos.y, objData.basePos.z);
-
-    if (!objData.isClone) {
-      grp = objData.type === 'buildings' ? buildingsGroup : mountainGroup;
+    // Ensure base groups are present or removed according to snapshot
+    const hasBaseBuildings = snap.objects.some((o) => !o.isClone && o.type === 'buildings');
+    if (hasBaseBuildings) {
+      if (!scene.children.includes(buildingsGroup)) scene.add(buildingsGroup);
     } else {
-      const srcGroup = objData.type === 'buildings' ? buildingsGroup : mountainGroup;
-      grp = srcGroup.clone(true);
-      scene.add(grp);
+      scene.remove(buildingsGroup);
     }
 
-    grp.position.set(
-      basePos.x + objData.offset.x,
-      basePos.y + objData.offset.y,
-      basePos.z + objData.offset.z
-    );
-    grp.rotation.y = (objData.offset.rotY * Math.PI) / 180;
-    prepareMeshShadows(grp);
+    const hasBaseMountains = snap.objects.some((o) => !o.isClone && o.type === 'mountains');
+    if (hasBaseMountains) {
+      if (!scene.children.includes(mountainGroup)) scene.add(mountainGroup);
+    } else {
+      scene.remove(mountainGroup);
+    }
 
-    newRegistry.push({
-      id: objData.id,
-      type: objData.type,
-      name: objData.name,
-      isClone: objData.isClone,
-      group: grp,
-      basePos: basePos,
-      offset: { ...objData.offset },
+    // 2. Reconstruct objectsRegistry
+    const newRegistry = [];
+
+    snap.objects.forEach((objData) => {
+      let grp;
+      const basePos = new THREE.Vector3(objData.basePos.x, objData.basePos.y, objData.basePos.z);
+
+      if (!objData.isClone) {
+        grp = objData.type === 'buildings' ? buildingsGroup : mountainGroup;
+      } else {
+        const srcGroup = objData.type === 'buildings' ? buildingsGroup : mountainGroup;
+        grp = srcGroup.clone(true);
+        scene.add(grp);
+      }
+
+      grp.position.set(
+        basePos.x + objData.offset.x,
+        basePos.y + objData.offset.y,
+        basePos.z + objData.offset.z
+      );
+      grp.rotation.y = (objData.offset.rotY * Math.PI) / 180;
+      prepareMeshShadows(grp);
+
+      newRegistry.push({
+        id: objData.id,
+        type: objData.type,
+        name: objData.name,
+        isClone: objData.isClone,
+        group: grp,
+        basePos: basePos,
+        offset: { ...objData.offset },
+      });
     });
-  });
 
-  objectsRegistry = newRegistry;
-  selectedObjectId = snap.selectedObjectId;
-  if (!objectsRegistry.some((o) => o.id === selectedObjectId)) {
-    selectedObjectId = objectsRegistry.length > 0 ? objectsRegistry[0].id : null;
+    objectsRegistry = newRegistry;
+    selectedObjectId = snap.selectedObjectId;
+    if (!objectsRegistry.some((o) => o.id === selectedObjectId)) {
+      selectedObjectId = objectsRegistry.length > 0 ? objectsRegistry[0].id : null;
+    }
+
+    updateObjectSelectOptions();
+    updateSliderUI();
+
+    // 3. Ground Texture
+    if (snap.groundType && snap.groundType !== currentGroundType) {
+      switchGround(snap.groundType);
+    }
+
+    // 4. Mountain Style
+    if (snap.mountainStyle && mountainStyleSelect) {
+      mountainStyleSelect.value = snap.mountainStyle;
+      switchMountainStyle(snap.mountainStyle);
+    }
+
+    // 5. Brightness
+    if (snap.brightness !== undefined) {
+      if (brightnessSlider) brightnessSlider.value = snap.brightness;
+      setBrightnessLevel(snap.brightness);
+    }
+
+    // 6. Sky Speed & Direction
+    if (snap.skySpeed !== undefined) {
+      if (skySpeedSlider) skySpeedSlider.value = snap.skySpeed;
+      updateSkySpeed(snap.skySpeed);
+    }
+    if (snap.skyDirection) {
+      currentSkyDirection = snap.skyDirection;
+      dirButtons.forEach((b) => {
+        if (b.dataset.dir === snap.skyDirection) b.classList.add('active');
+        else b.classList.remove('active');
+      });
+    }
+
+    // 7. Universal Asset Lighting & Shadows
+    if (snap.sunAngle !== undefined) currentSunAngle = snap.sunAngle;
+    if (snap.sunHeight !== undefined) currentSunHeight = snap.sunHeight;
+    if (snap.assetBrightness !== undefined) currentAssetBrightness = snap.assetBrightness;
+    if (snap.shadowDarkness !== undefined) currentShadowDarkness = snap.shadowDarkness;
+    updateAssetLighting();
+
+    // 8. Universal 3D Images Restoration
+    if (snap.images3d && typeof buildImageGeometryAndMaterials === 'function') {
+      const targetImageIds = new Set(snap.images3d.map((i) => i.id));
+      const remainingImages = [];
+      image3dRegistry.forEach((imgObj) => {
+        if (!targetImageIds.has(imgObj.id)) {
+          scene.remove(imgObj.group);
+          deletedImagesCache.set(imgObj.id, imgObj);
+        } else {
+          remainingImages.push(imgObj);
+        }
+      });
+      image3dRegistry = remainingImages;
+
+      const newImageRegistry = [];
+      snap.images3d.forEach((item) => {
+        let imgObj = image3dRegistry.find((o) => o.id === item.id);
+        if (!imgObj && deletedImagesCache.has(item.id)) {
+          imgObj = deletedImagesCache.get(item.id);
+          deletedImagesCache.delete(item.id);
+          scene.add(imgObj.group);
+        }
+
+        if (imgObj) {
+          imgObj.width = item.width;
+          imgObj.height = item.height;
+          imgObj.depth = item.depth;
+          imgObj.transparency = item.transparency;
+          imgObj.reflection = item.reflection;
+          imgObj.position = { ...item.position };
+          imgObj.rotationY = item.rotationY;
+
+          buildImageGeometryAndMaterials(imgObj);
+          imgObj.group.position.set(imgObj.position.x, imgObj.position.y, imgObj.position.z);
+          imgObj.group.rotation.y = (imgObj.rotationY * Math.PI) / 180;
+          prepareMeshShadows(imgObj.group);
+          newImageRegistry.push(imgObj);
+        } else if (item.dataUrl) {
+          const img = new Image();
+          const freshObj = {
+            id: item.id,
+            name: item.name,
+            dataUrl: item.dataUrl,
+            img: img,
+            hasAlpha: item.hasAlpha,
+            aspect: item.aspect,
+            width: item.width,
+            height: item.height,
+            depth: item.depth,
+            transparency: item.transparency,
+            reflection: item.reflection,
+            position: { ...item.position },
+            rotationY: item.rotationY,
+            group: new THREE.Group(),
+          };
+          img.onload = () => {
+            buildImageGeometryAndMaterials(freshObj);
+            freshObj.group.position.set(freshObj.position.x, freshObj.position.y, freshObj.position.z);
+            freshObj.group.rotation.y = (freshObj.rotationY * Math.PI) / 180;
+            scene.add(freshObj.group);
+            prepareMeshShadows(freshObj.group);
+            if (typeof updateImageSliderUI === 'function') updateImageSliderUI();
+          };
+          img.src = item.dataUrl;
+          newImageRegistry.push(freshObj);
+        }
+      });
+
+      image3dRegistry = newImageRegistry;
+      selectedImageId = snap.selectedImageId;
+      if (!image3dRegistry.some((o) => o.id === selectedImageId)) {
+        selectedImageId = image3dRegistry.length > 0 ? image3dRegistry[0].id : null;
+      }
+      if (typeof updateImageSelectOptions === 'function') updateImageSelectOptions();
+      if (typeof updateImageSliderUI === 'function') updateImageSliderUI();
+    }
+
+    // 9. Universal 3D Cuboids Restoration
+    if (snap.cuboids3d && typeof buildCuboidMesh === 'function') {
+      const targetCuboidIds = new Set(snap.cuboids3d.map((c) => c.id));
+      const remainingCuboids = [];
+      cuboid3dRegistry.forEach((cObj) => {
+        if (!targetCuboidIds.has(cObj.id)) {
+          scene.remove(cObj.group);
+          deletedCuboidsCache.set(cObj.id, cObj);
+        } else {
+          remainingCuboids.push(cObj);
+        }
+      });
+      cuboid3dRegistry = remainingCuboids;
+
+      const newCuboidRegistry = [];
+      snap.cuboids3d.forEach((item) => {
+        let cObj = cuboid3dRegistry.find((c) => c.id === item.id);
+        if (!cObj && deletedCuboidsCache.has(item.id)) {
+          cObj = deletedCuboidsCache.get(item.id);
+          deletedCuboidsCache.delete(item.id);
+          scene.add(cObj.group);
+        }
+
+        if (!cObj) {
+          cObj = {
+            id: item.id,
+            name: item.name,
+            width: item.width,
+            height: item.height,
+            depth: item.depth,
+            smoothness: item.smoothness,
+            color: item.color,
+            texture: null,
+            textureDataUrl: item.textureDataUrl || null,
+            position: { ...item.position },
+            rotation: { ...item.rotation },
+            group: new THREE.Group(),
+          };
+          scene.add(cObj.group);
+        } else {
+          cObj.name = item.name;
+          cObj.width = item.width;
+          cObj.height = item.height;
+          cObj.depth = item.depth;
+          cObj.smoothness = item.smoothness;
+          cObj.color = item.color;
+          cObj.position = { ...item.position };
+          cObj.rotation = { ...item.rotation };
+        }
+
+        if (item.textureDataUrl && item.textureDataUrl !== cObj.textureDataUrl) {
+          cObj.textureDataUrl = item.textureDataUrl;
+          new THREE.TextureLoader().load(item.textureDataUrl, (tex) => {
+            tex.colorSpace = THREE.SRGBColorSpace;
+            cObj.texture = tex;
+            buildCuboidMesh(cObj);
+          });
+        } else if (!item.textureDataUrl && cObj.texture) {
+          cObj.texture = null;
+          cObj.textureDataUrl = null;
+          buildCuboidMesh(cObj);
+        } else {
+          buildCuboidMesh(cObj);
+        }
+
+        cObj.group.position.set(cObj.position.x, cObj.position.y, cObj.position.z);
+        cObj.group.rotation.set(
+          (cObj.rotation.x * Math.PI) / 180,
+          (cObj.rotation.y * Math.PI) / 180,
+          (cObj.rotation.z * Math.PI) / 180
+        );
+        prepareMeshShadows(cObj.group);
+        newCuboidRegistry.push(cObj);
+      });
+
+      cuboid3dRegistry = newCuboidRegistry;
+      selectedCuboidId = snap.selectedCuboidId;
+      if (!cuboid3dRegistry.some((c) => c.id === selectedCuboidId)) {
+        selectedCuboidId = cuboid3dRegistry.length > 0 ? cuboid3dRegistry[0].id : null;
+      }
+      if (typeof updateCuboidSelectOptions === 'function') updateCuboidSelectOptions();
+      if (typeof updateCuboidSliderUI === 'function') updateCuboidSliderUI();
+    }
+  } finally {
+    isRestoringHistory = false;
   }
-
-  updateObjectSelectOptions();
-  updateSliderUI();
-
-  // 3. Ground Texture
-  if (snap.groundType && snap.groundType !== currentGroundType) {
-    switchGround(snap.groundType);
-  }
-
-  // 4. Mountain Style
-  if (snap.mountainStyle && mountainStyleSelect) {
-    mountainStyleSelect.value = snap.mountainStyle;
-    switchMountainStyle(snap.mountainStyle);
-  }
-
-  // 5. Brightness
-  if (snap.brightness !== undefined) {
-    if (brightnessSlider) brightnessSlider.value = snap.brightness;
-    setBrightnessLevel(snap.brightness);
-  }
-
-  // 6. Sky Speed & Direction
-  if (snap.skySpeed !== undefined) {
-    if (skySpeedSlider) skySpeedSlider.value = snap.skySpeed;
-    updateSkySpeed(snap.skySpeed);
-  }
-  if (snap.skyDirection) {
-    currentSkyDirection = snap.skyDirection;
-    dirButtons.forEach((b) => {
-      if (b.dataset.dir === snap.skyDirection) b.classList.add('active');
-      else b.classList.remove('active');
-    });
-  }
-
-  // 7. Universal Asset Lighting & Shadows
-  if (snap.sunAngle !== undefined) currentSunAngle = snap.sunAngle;
-  if (snap.sunHeight !== undefined) currentSunHeight = snap.sunHeight;
-  if (snap.assetBrightness !== undefined) currentAssetBrightness = snap.assetBrightness;
-  if (snap.shadowDarkness !== undefined) currentShadowDarkness = snap.shadowDarkness;
-  updateAssetLighting();
 }
 
 function undo() {
@@ -1147,6 +1368,7 @@ function undo() {
   const prevSnap = undoStack.pop();
   restoreSnapshot(prevSnap);
   updateHistoryButtons();
+  showHistoryToast('↩️ Undone');
 
   if (duplicateStatus) {
     duplicateStatus.textContent = '↩️ Undo performed';
@@ -1161,6 +1383,7 @@ function redo() {
   const nextSnap = redoStack.pop();
   restoreSnapshot(nextSnap);
   updateHistoryButtons();
+  showHistoryToast('↪️ Redone');
 
   if (duplicateStatus) {
     duplicateStatus.textContent = '↪️ Redo performed';
@@ -2144,8 +2367,7 @@ const imgPosZVal = document.getElementById('img-pos-z-val');
 const imgRotYSlider = document.getElementById('img-rot-y-slider');
 const imgRotYVal = document.getElementById('img-rot-y-val');
 
-let image3dRegistry = [];
-let selectedImageId = null;
+// (image3dRegistry & selectedImageId are declared globally at top for Universal History)
 
 function getSelectedImage3D() {
   return image3dRegistry.find((o) => o.id === selectedImageId) || (image3dRegistry.length > 0 ? image3dRegistry[0] : null);
@@ -2685,9 +2907,9 @@ function updateImageSliderUI() {
   if (imgRotYVal) imgRotYVal.textContent = `${obj.rotationY}°`;
 }
 
-let imageCountIndex = 0;
-function createImage3DObject(img, dataUrl, fileName) {
-  if (typeof pushHistoryState === 'function') pushHistoryState();
+// (imageCountIndex is declared globally at top for Universal History)
+function createImage3DObject(img, dataUrl, fileName, options = {}) {
+  if (!options.skipHistory && typeof pushHistoryState === 'function') pushHistoryState();
 
   imageCountIndex++;
   const id = `image3d_${Date.now()}_${imageCountIndex}`;
@@ -2790,6 +3012,7 @@ if (btnDeleteImage) {
     if (typeof pushHistoryState === 'function') pushHistoryState();
 
     const obj = image3dRegistry[idx];
+    deletedImagesCache.set(obj.id, obj);
     scene.remove(obj.group);
     image3dRegistry.splice(idx, 1);
 
@@ -2979,9 +3202,7 @@ const cuboidRotYVal = document.getElementById('cuboid-rot-y-val');
 const cuboidRotXSlider = document.getElementById('cuboid-rot-x-slider');
 const cuboidRotXVal = document.getElementById('cuboid-rot-x-val');
 
-const cuboid3dRegistry = [];
-let selectedCuboidId = null;
-let cuboidCountIndex = 0;
+// (cuboid3dRegistry, selectedCuboidId & cuboidCountIndex are declared globally at top for Universal History)
 
 function getSelectedCuboid() {
   return cuboid3dRegistry.find((c) => c.id === selectedCuboidId) || (cuboid3dRegistry.length > 0 ? cuboid3dRegistry[0] : null);
@@ -3238,7 +3459,7 @@ function updateCuboidSliderUI() {
 }
 
 function createCuboid3DObject(customOptions = {}) {
-  if (typeof pushHistoryState === 'function') pushHistoryState();
+  if (!customOptions.skipHistory && typeof pushHistoryState === 'function') pushHistoryState();
 
   cuboidCountIndex++;
   const id = `cuboid_${Date.now()}_${cuboidCountIndex}`;
@@ -3336,9 +3557,8 @@ if (btnDeleteCuboid) {
     if (typeof pushHistoryState === 'function') pushHistoryState();
 
     const cObj = cuboid3dRegistry[idx];
+    deletedCuboidsCache.set(cObj.id, cObj);
     scene.remove(cObj.group);
-    if (cObj.mesh && cObj.mesh.geometry) cObj.mesh.geometry.dispose();
-    if (cObj.material) cObj.material.dispose();
 
     cuboid3dRegistry.splice(idx, 1);
     selectedCuboidId = cuboid3dRegistry.length > 0 ? cuboid3dRegistry[0].id : null;
@@ -3397,6 +3617,16 @@ if (cuboidSmoothnessSlider) {
 
 // Custom Color Picker
 if (cuboidColorPicker) {
+  let beforeColorSnap = null;
+  cuboidColorPicker.addEventListener('click', () => {
+    beforeColorSnap = captureSnapshot();
+  });
+  cuboidColorPicker.addEventListener('change', () => {
+    if (beforeColorSnap) {
+      pushHistoryState(beforeColorSnap);
+      beforeColorSnap = null;
+    }
+  });
   cuboidColorPicker.addEventListener('input', (e) => {
     const c = getSelectedCuboid();
     if (!c) return;
@@ -3549,4 +3779,8 @@ createCuboid3DObject({
   color: '#06b6d4',
   position: { x: 5, y: 3, z: 115 },
   rotation: { x: 0, y: 25, z: 0 },
+  skipHistory: true,
 });
+undoStack.length = 0;
+redoStack.length = 0;
+updateHistoryButtons();
